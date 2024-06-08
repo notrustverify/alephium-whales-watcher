@@ -1,0 +1,11 @@
+version: "3.3"
+
+
+services:
+  whales-watcher:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - ./articles.csv:/articles.csv
+    env_file:
+      - .env
