@@ -16,15 +16,12 @@ require (
 )
 
 require (
-	github.com/Masterminds/semver/v3 v3.1.1 // indirect
-	github.com/aws/jsii-runtime-go v1.44.1 // indirect
 	github.com/bytedance/sonic v1.11.8 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/grbit/go-json v0.11.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
-	github.com/mexcdevelop/mexc-api-sdk v0.0.0-20231124024026-e2559d4b7def // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/valyala/fastjson v1.6.4 // indirect
 	golang.org/x/arch v0.6.0 // indirect
@@ -35,7 +32,6 @@ require (
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/fasthttp/router v1.5.1 // indirect
 	github.com/gateio/gateapi-go/v6 v6.57.0
-	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/klauspost/compress v1.17.7 // indirect
