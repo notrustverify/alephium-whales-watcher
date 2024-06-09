@@ -41,13 +41,18 @@ func getTradesMexc(from int64, to int64) {
 			log.Printf("Cannot convert mexc price, err: %s\n", err)
 		}
 
+		quoteQtyToFloat, err := strconv.ParseFloat(v.QuoteQty, 64)
+		if err != nil {
+			log.Printf("Cannot convert mexc quote quantity, err: %s\n", err)
+		}
+
 		side := "buy"
 		if v.IsBuyerMaker {
 			side = "sell"
 		}
 
 		if amountToFloat >= parameters.MinAmountTrigger && v.Time >= from && v.Time <= to {
-			chMessagesCex <- MessageCex{side, amountToFloat, amountToFloat * priceToFloat, "Mexc", priceToFloat}
+			chMessagesCex <- MessageCex{side, amountToFloat, quoteQtyToFloat, "Mexc", priceToFloat}
 		}
 	}
 
