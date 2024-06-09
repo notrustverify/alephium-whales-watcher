@@ -152,7 +152,7 @@ func messageFormat(msg Message, isTelegram bool) string {
 	if amountFiat >= 1000 {
 		amountFiatString = fmt.Sprintf("%.2f K USDT", amountFiat/1000.0)
 	} else if amountFiat >= 1e6 {
-		amountFiatString = fmt.Sprintf("%.2f K USDT", amountFiat/float64(1e6))
+		amountFiatString = fmt.Sprintf("%.2f M USDT", amountFiat/float64(1e6))
 	}
 
 	addrFrom, alertEmojiFrom := formatAddress(&namedWalletFrom, msg.from, msg.amount, false)
