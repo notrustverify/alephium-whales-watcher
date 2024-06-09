@@ -231,10 +231,22 @@ func formatCexMessage(msg MessageCex) string {
 		sideActionEmoji = "🔴"
 	}
 
-	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %.2f ℵ\nTotal: %.2f USDT (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, msg.Amount, msg.AmountFiat, msg.Price)
+	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %s \nTotal: %s (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, humanizeAmount(msg.Amount, "ALPH"), humanizeAmount(msg.AmountFiat, "USDT"), msg.Price)
 
 	fmt.Println(text)
 	return text
+
+}
+
+func humanizeAmount(amount float64, symbol string) string {
+	amountStr := fmt.Sprintf("%.2f %s", amount, symbol)
+	if amount >= 1000 {
+		amountStr = fmt.Sprintf("%.2f K %s", amount/1000.0, symbol)
+	} else if amount >= 1e6 {
+		amountStr = fmt.Sprintf("%.2f M %s", amount/float64(1e6), symbol)
+	}
+
+	return amountStr
 
 }
 
