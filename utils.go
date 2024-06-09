@@ -231,7 +231,7 @@ func formatCexMessage(msg MessageCex) string {
 		sideActionEmoji = "🔴"
 	}
 
-	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %.2f ℵ\nTotal: %.2f USDT (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, msg.Amount, msg.Amount, msg.Price)
+	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %.2f ℵ\nTotal: %.2f USDT (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, msg.Amount, msg.AmountFiat, msg.Price)
 
 	fmt.Println(text)
 	return text
