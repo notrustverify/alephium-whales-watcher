@@ -10,6 +10,7 @@ import (
 	"github.com/go-co-op/gocron"
 	"github.com/michimani/gotwi"
 	"github.com/mymmrac/telego"
+	ta "github.com/mymmrac/telego/telegoapi"
 )
 
 type Message struct {
@@ -17,6 +18,14 @@ type Message struct {
 	to     string
 	amount float64
 	txId   string
+}
+
+type MessageCex struct {
+	Side         string
+	Amount       float64
+	AmountFiat   float64
+	ExchangeName string
+	Price        float64
 }
 
 type Parameters struct {
@@ -59,7 +68,7 @@ func main() {
 	cronScheduler.Every("5m").Do(updatePrice)
 	cronScheduler.Every("1h").Do(updateKnownWallet)
 	cronScheduler.StartAsync()
-	rand.Seed(time.Now().UTC().UnixNano())
+	rand.NewSource(time.Now().UnixNano())
 	getRndArticles()
 
 	chMessages = make(chan Message)
@@ -114,8 +123,9 @@ func getCexTrades() {
 	for {
 		t := time.Now().Unix()
 
-		getTrades(t-parameters.PollingIntervalSec, t)
-
+		getTradesGate(t-parameters.PollingIntervalSec, t)
+		getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000)
+		getTradesBitget(t*1000-parameters.PollingIntervalSec*1000, t*1000)
 		log.Println("CEX - Sleepy sleepy")
 		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)
 	}
@@ -123,7 +133,18 @@ func getCexTrades() {
 }
 
 func initTelegram() *telego.Bot {
-	bot, err := telego.NewBot(parameters.TelegramTokenApi)
+	bot, err := telego.NewBot(parameters.TelegramTokenApi, telego.WithAPICaller(&ta.RetryCaller{
+		// Use caller
+		Caller: ta.DefaultFastHTTPCaller,
+		// Max number of attempts to make call
+		MaxAttempts: 4,
+		// Exponent base for delay
+		ExponentBase: 2,
+		// Starting delay duration
+		StartDelay: time.Millisecond * 30,
+		// Maximum delay duration
+		MaxDelay: time.Second,
+	}))
 	if nil != err {
 		// panics for the sake of simplicity.
 		// you should handle this error properly in your code.

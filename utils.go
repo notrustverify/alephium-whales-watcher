@@ -47,7 +47,7 @@ type CsvArticles struct {
 func loadEnv() {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Printf("Will load from env var\n", err)
+		log.Printf("Will load from env var\n")
 	}
 
 	chatIdInt, err := strconv.ParseInt(os.Getenv("CHAT_ID"), 10, 64)
@@ -252,10 +252,10 @@ func getAddressName(address *string) KnownWallet {
 func sendTelegramMessage(b *telego.Bot, chatId int64, message string) {
 	chatID := telego.ChatID{ID: chatId}
 	_, err := b.SendMessage(&telego.SendMessageParams{
-		ChatID:                chatID,
-		Text:                  message,
-		DisableWebPagePreview: true,
-		ParseMode:             telego.ModeHTML,
+		ChatID:             chatID,
+		Text:               message,
+		LinkPreviewOptions: &telego.LinkPreviewOptions{IsDisabled: true},
+		ParseMode:          telego.ModeHTML,
 	})
 	if err != nil {
 		log.Printf("error telegram bot: %s", err)
@@ -286,6 +286,7 @@ func updatePrice() {
 	if err != nil {
 		log.Printf("Error getting price\n%s\n", err)
 	}
+
 	if len(dataBytes) > 0 {
 		var coinGeckoApi CoinGeckoPrice
 		json.Unmarshal(dataBytes, &coinGeckoApi)

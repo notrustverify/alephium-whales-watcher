@@ -9,15 +9,7 @@ import (
 	"github.com/gateio/gateapi-go/v6"
 )
 
-type MessageCex struct {
-	Side         string
-	Amount       float64
-	AmountFiat   float64
-	ExchangeName string
-	Price        float64
-}
-
-func getTrades(from int64, to int64) {
+func getTradesGate(from int64, to int64) {
 
 	client := gateapi.NewAPIClient(gateapi.NewConfiguration())
 	// uncomment the next line if your are testing against testnet
@@ -29,8 +21,10 @@ func getTrades(from int64, to int64) {
 	if err != nil {
 		if e, ok := err.(gateapi.GateAPIError); ok {
 			log.Printf("gate api error: %s\n", e.Error())
+			return
 		} else {
 			log.Printf("generic error: %s\n", err.Error())
+			return
 		}
 	} else {
 
