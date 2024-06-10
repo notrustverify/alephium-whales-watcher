@@ -13,6 +13,8 @@ import (
 	openapiclient "github.com/alephium/go-sdk"
 )
 
+const MAX_RETRY = 3600
+
 type Transaction struct {
 	Type      string `json:"type"`
 	Hash      string `json:"hash"`
@@ -69,9 +71,11 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 func getTxData(txId string) {
 	var txData Transaction
 
+	cntRetry := 0
 	for {
 		dataBytes, statusCode, err := getHttp(fmt.Sprintf("%s/transactions/%s", parameters.ExplorerApi, txId))
-		if err != nil {
+
+		if err != nil && statusCode != 404 { // do not print error if 404
 			log.Printf("Error get data from explorer\n%s\n", err)
 		}
 
@@ -92,6 +96,12 @@ func getTxData(txId string) {
 		if strings.ToLower(txData.Type) == "accepted" {
 			break
 		}
+
+		if cntRetry >= MAX_RETRY {
+			return
+		}
+
+		cntRetry++
 		time.Sleep(1 * time.Second)
 	}
 
