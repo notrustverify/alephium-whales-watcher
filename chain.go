@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	openapiclient "github.com/alephium/go-sdk"
 )
@@ -42,8 +43,6 @@ type Transaction struct {
 	Coinbase          bool   `json:"coinbase"`
 }
 
-var txs []string
-
 func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context, fromTs int64, toTs int64) {
 	blocks, r, err := apiClient.BlockflowApi.GetBlockflowBlocks(*ctx).FromTs(fromTs).ToTs(toTs).Execute()
 	if err != nil {
@@ -56,10 +55,9 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 			for tx := 0; tx < len(block[blockId].Transactions); tx++ {
 				if len(block[blockId].Transactions[tx].Unsigned.Inputs) > 0 {
 					txId := block[blockId].Transactions[tx].Unsigned.TxId
-
+					fmt.Println(txId)
 					//getTxData(apiClient, ctx, txId)
-					txs = append(txs, txId)
-
+					chTxs <- txId
 				}
 			}
 
@@ -69,22 +67,32 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 }
 
 func getTxData(txId string) {
-	dataBytes, statusCode, err := getHttp(fmt.Sprintf("%s/transactions/%s", parameters.ExplorerApi, txId))
-	if err != nil && statusCode != 404 {
-		log.Printf("Error get data from explorer\n%s\n", err)
-	}
-
-	if len(dataBytes) <= 0 {
-		txs = append(txs, txId)
-		return
-	}
-
 	var txData Transaction
-	json.Unmarshal(dataBytes, &txData)
 
-	if strings.ToLower(txData.Type) != "accepted" {
-		txs = append(txs, txId)
-		return
+	for {
+		dataBytes, statusCode, err := getHttp(fmt.Sprintf("%s/transactions/%s", parameters.ExplorerApi, txId))
+		if err != nil {
+			log.Printf("Error get data from explorer\n%s\n", err)
+		}
+
+		if statusCode != 404 && statusCode != 200 {
+			log.Printf("Unknown error code from explorer: status code %d\n", statusCode)
+			return
+		}
+
+		if statusCode == 200 && len(dataBytes) > 0 {
+			err := json.Unmarshal(dataBytes, &txData)
+			if err != nil {
+				log.Printf("Cannot unmarshall data, err: %s\n", err)
+				panic(1)
+			}
+			break
+		}
+
+		if strings.ToLower(txData.Type) == "accepted" {
+			break
+		}
+		time.Sleep(1 * time.Second)
 	}
 
 	//log.Printf("Input %+v\n", txData)

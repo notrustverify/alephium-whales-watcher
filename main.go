@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -44,6 +45,9 @@ type Parameters struct {
 
 var chMessages chan Message
 var chMessagesCex chan MessageCex
+
+var chTxs chan string
+
 var telegramBot *telego.Bot
 var twitterBot *gotwi.Client
 var KnownWallets []KnownWallet
@@ -73,6 +77,7 @@ func main() {
 
 	chMessages = make(chan Message)
 	chMessagesCex = make(chan MessageCex)
+	chTxs = make(chan string)
 
 	updateKnownWallet()
 	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
@@ -85,6 +90,7 @@ func main() {
 
 	go consumerChain()
 	go consumerCex()
+	go checkTx()
 
 	telegramBot = initTelegram()
 	var err error
@@ -96,26 +102,25 @@ func main() {
 
 	//log.Printf("%+v\n", knownWallets)
 
-	go getCexTrades()
+	//go getCexTrades()
 	//getTxData(apiClient, &ctxAlephium, "777100496c124eb7b354285750b8ed8746ecc877de58c112fa23b721731e7c08")
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 
 	for {
 		t := time.Now().Unix()
 		getBlocksFullnode(apiClient, &ctxAlephium, t*1000-parameters.PollingIntervalSec*1000, t*1000)
-
-		// store all txs in array
-		for txIndex := 0; txIndex < len(txs); txIndex++ {
-			txIdToCheck := txs[txIndex]
-
-			txs = removeElement(txs, txIndex)
-			getTxData(txIdToCheck)
-		}
-
-		log.Printf("Pending txs to check: %d\n", len(txs))
 		log.Println("Sleepy sleepy")
 		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)
 
+	}
+
+}
+
+func checkTx() {
+	for {
+		fmt.Println("Checking tx")
+		tx := <-chTxs
+		getTxData(tx)
 	}
 }
 
