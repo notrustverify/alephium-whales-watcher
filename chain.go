@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	openapiclient "github.com/alephium/go-sdk"
@@ -52,20 +53,30 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
 	}
 
+	wg := sync.WaitGroup{}
+
 	for group := 0; group < len(blocks.Blocks); group++ {
 		block := blocks.Blocks[group]
-		for blockId := 0; blockId < len(blocks.Blocks[group]); blockId++ {
-			for tx := 0; tx < len(block[blockId].Transactions); tx++ {
-				if len(block[blockId].Transactions[tx].Unsigned.Inputs) > 0 {
-					txId := block[blockId].Transactions[tx].Unsigned.TxId
-					//getTxData(apiClient, ctx, txId)
-					chTxs <- txId
-				}
-			}
+		wg.Add(1)
+		go getTxId(&block, &wg)
+	}
+	wg.Wait()
+}
 
+func getTxId(block *[]openapiclient.BlockEntry, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for _, txs := range *block {
+		for _, tx := range txs.Transactions {
+			if len(tx.Unsigned.Inputs) > 0 {
+				txId := tx.Unsigned.TxId
+				fmt.Println(txId)
+				chTxs <- txId
+			}
 		}
 
 	}
+
 }
 
 func getTxStateExplorer(txId string, tx *Transaction) bool {
