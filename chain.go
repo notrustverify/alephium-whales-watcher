@@ -68,32 +68,44 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 	}
 }
 
+func getTxStateExplorer(txId string, tx *Transaction) bool {
+	dataBytes, statusCode, err := getHttp(fmt.Sprintf("%s/transactions/%s", parameters.ExplorerApi, txId))
+
+	if err != nil { // do not print error if 404
+		log.Printf("Error get data from explorer\n%s\n", err)
+		return false
+	}
+
+	if statusCode != 404 && statusCode != 200 {
+		log.Printf("Unknown error code from explorer: status code %d\n", statusCode)
+		return false
+	}
+
+	if statusCode == 200 && len(dataBytes) > 0 {
+		err := json.Unmarshal(dataBytes, &tx)
+		if err != nil {
+			log.Printf("Cannot unmarshall data, err: %s\n", err)
+			panic(1)
+		}
+	}
+
+	if strings.ToLower(tx.Type) == "accepted" {
+		return true
+	} else {
+		fmt.Printf("%+v\n", tx)
+	}
+
+	return false
+
+}
+
 func getTxData(txId string) {
 	var txData Transaction
-
 	cntRetry := 0
+
 	for {
-		dataBytes, statusCode, err := getHttp(fmt.Sprintf("%s/transactions/%s", parameters.ExplorerApi, txId))
 
-		if err != nil && statusCode != 404 { // do not print error if 404
-			log.Printf("Error get data from explorer\n%s\n", err)
-		}
-
-		if statusCode != 404 && statusCode != 200 {
-			log.Printf("Unknown error code from explorer: status code %d\n", statusCode)
-			return
-		}
-
-		if statusCode == 200 && len(dataBytes) > 0 {
-			err := json.Unmarshal(dataBytes, &txData)
-			if err != nil {
-				log.Printf("Cannot unmarshall data, err: %s\n", err)
-				panic(1)
-			}
-			break
-		}
-
-		if strings.ToLower(txData.Type) == "accepted" {
+		if getTxStateExplorer(txId, &txData) {
 			break
 		}
 
@@ -103,6 +115,7 @@ func getTxData(txId string) {
 
 		cntRetry++
 		time.Sleep(1 * time.Second)
+
 	}
 
 	//log.Printf("Input %+v\n", txData)

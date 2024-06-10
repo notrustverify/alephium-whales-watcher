@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -118,7 +117,6 @@ func main() {
 
 func checkTx() {
 	for {
-		fmt.Println("Checking tx")
 		tx := <-chTxs
 		getTxData(tx)
 	}
