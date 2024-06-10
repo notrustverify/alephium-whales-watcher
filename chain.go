@@ -91,8 +91,6 @@ func getTxStateExplorer(txId string, tx *Transaction) bool {
 
 	if strings.ToLower(tx.Type) == "accepted" {
 		return true
-	} else {
-		fmt.Printf("%+v\n", tx)
 	}
 
 	return false
