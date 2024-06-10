@@ -128,8 +128,8 @@ func getRndArticles() CsvArticles {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	article := CsvArticles{Title: data[randInt(1, len(data))][0], Url: data[randInt(1, len(data))][1]}
+	rndArticleIndex := randInt(1, len(data))
+	article := CsvArticles{Title: data[rndArticleIndex][0], Url: data[rndArticleIndex][1]}
 
 	return article
 }
