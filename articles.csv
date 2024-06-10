@@ -1,10 +1,11 @@
-Stateful UTXO;https://medium.com/@alephium/8de3b0f76749
-Proof-of-Less-Work;https://medium.com/@alephium/ba70644ab301
-Alphred Virtual Machine;https://medium.com/@alephium/85ce86540025
-Blockflow: Alephium’s sharding algorithm;https://medium.com/@alephium/bbbf318c3402
-Asset Permission System;https://medium.com/@alephium/5407e7e70a33
-Block Time and Block Size;https://medium.com/@alephium/16e37292444f
-Transactions Per Second (TPS);https://medium.com/@alephium/f13217a49e39
-Time to Finality;https://medium.com/@alephium/17d64eeffd25
-Account Model meets UTXO;https://www.youtube.com/watch?v=VVYH9rBJAdA
-Alephium by Coingecko;https://www.coingecko.com/learn/what-is-alephium-rhone-upgrade-alephium-ecosystem
+title,link
+Stateful UTXO,https://medium.com/@alephium/8de3b0f76749
+Proof-of-Less-Work,https://medium.com/@alephium/ba70644ab301
+Alphred Virtual Machine,https://medium.com/@alephium/85ce86540025
+Blockflow: Alephium’s sharding algorithm,https://medium.com/@alephium/bbbf318c3402
+Asset Permission System,https://medium.com/@alephium/5407e7e70a33
+Block Time and Block Size,https://medium.com/@alephium/16e37292444f
+Transactions Per Second (TPS),https://medium.com/@alephium/f13217a49e39
+Time to Finality,https://medium.com/@alephium/17d64eeffd25
+Account Model meets UTXO,https://www.youtube.com/watch?v=VVYH9rBJAdA
+Alephium by Coingecko,https://www.coingecko.com/learn/what-is-alephium-rhone-upgrade-alephium-ecosystem

@@ -123,7 +123,7 @@ func getRndArticles() CsvArticles {
 	defer f.Close()
 
 	csvReader := csv.NewReader(f)
-	csvReader.Comma = ';'
+	csvReader.Comma = ','
 	data, err := csvReader.ReadAll()
 	if err != nil {
 		log.Fatal(err)
