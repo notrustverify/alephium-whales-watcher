@@ -13,7 +13,7 @@ import (
 	openapiclient "github.com/alephium/go-sdk"
 )
 
-const MAX_RETRY = 3600
+const maxRetry = 3600
 
 type Transaction struct {
 	Type      string `json:"type"`
@@ -107,7 +107,7 @@ func getTxData(txId string) {
 			break
 		}
 
-		if cntRetry >= MAX_RETRY {
+		if cntRetry >= maxRetry {
 			return
 		}
 
@@ -130,7 +130,7 @@ func getTxData(txId string) {
 
 		if strings.ToLower(txType) == "assetoutput" {
 			attoStrToFloat, err := strconv.ParseFloat(txData.Outputs[outputIndex].AttoAlphAmount, 32)
-			hintAmountALPH := attoStrToFloat / BASE_ALPH
+			hintAmountALPH := attoStrToFloat / baseAlph
 
 			if hintAmountALPH >= parameters.MinAmountTrigger {
 

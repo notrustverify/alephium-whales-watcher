@@ -21,7 +21,7 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-const BASE_ALPH = 1e18
+const baseAlph = 1e18
 
 var coinGeckoPrice float64
 
