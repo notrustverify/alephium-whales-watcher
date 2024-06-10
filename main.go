@@ -102,7 +102,8 @@ func main() {
 	//log.Printf("%+v\n", knownWallets)
 
 	//go getCexTrades()
-	//getTxData(apiClient, &ctxAlephium, "777100496c124eb7b354285750b8ed8746ecc877de58c112fa23b721731e7c08")
+	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 
 	for {
