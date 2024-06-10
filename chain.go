@@ -51,13 +51,13 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 		fmt.Fprintf(os.Stderr, "Error when calling `BlockflowApi.GetBlockflowBlocks``: %v\n", err)
 		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
 	}
+
 	for group := 0; group < len(blocks.Blocks); group++ {
 		block := blocks.Blocks[group]
 		for blockId := 0; blockId < len(blocks.Blocks[group]); blockId++ {
 			for tx := 0; tx < len(block[blockId].Transactions); tx++ {
 				if len(block[blockId].Transactions[tx].Unsigned.Inputs) > 0 {
 					txId := block[blockId].Transactions[tx].Unsigned.TxId
-					fmt.Println(txId)
 					//getTxData(apiClient, ctx, txId)
 					chTxs <- txId
 				}
