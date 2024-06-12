@@ -74,9 +74,9 @@ func main() {
 	rand.NewSource(time.Now().UnixNano())
 	getRndArticles()
 
-	chMessages = make(chan Message)
-	chMessagesCex = make(chan MessageCex)
-	chTxs = make(chan string)
+	chMessages = make(chan Message, 100)
+	chMessagesCex = make(chan MessageCex, 100)
+	chTxs = make(chan string, 100)
 
 	updateKnownWallet()
 	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
@@ -87,8 +87,7 @@ func main() {
 	//defer cancel()
 	//telegramBot.Start(ctx)
 
-	go consumerChain()
-	go consumerCex()
+	go messageConsumer()
 	go checkTx()
 
 	telegramBot = initTelegram()
@@ -101,10 +100,11 @@ func main() {
 
 	//log.Printf("%+v\n", knownWallets)
 
-	//go getCexTrades()
-	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+	//chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
+
+	go getCexTrades()
 
 	for {
 		t := time.Now().Unix()
@@ -118,15 +118,19 @@ func main() {
 
 func checkTx() {
 	for {
-		tx := <-chTxs
-		getTxData(tx)
+
+		select {
+		case tx := <-chTxs:
+			getTxData(tx)
+		default:
+			time.Sleep(500 * time.Millisecond)
+		}
 	}
 }
 
 func getCexTrades() {
 	for {
 		t := time.Now().Unix()
-
 		getTradesGate(t-parameters.PollingIntervalSec, t)
 		getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000)
 		getTradesBitget(t*1000-parameters.PollingIntervalSec*1000, t*1000)
@@ -168,29 +172,28 @@ func initTwitter() (*gotwi.Client, error) {
 	return gotwi.NewClient(in)
 }
 
-func consumerChain() {
+func messageConsumer() {
 
 	for {
-		msg := <-chMessages
-		sendTelegramMessage(telegramBot, parameters.TelegramChatId, messageFormat(msg, true))
 
-		if twitterBot != nil {
-			sendTwitterPost(twitterBot, messageFormat(msg, false))
-		}
+		select {
+		case msg := <-chMessagesCex:
+			sendTelegramMessage(telegramBot, parameters.TelegramChatId, formatCexMessage(msg))
+
+			if twitterBot != nil {
+				sendTwitterPost(twitterBot, formatCexMessage(msg))
+			}
+			//formatCexMessage(<-chMessagesCex)
+		case msg := <-chMessages:
+			sendTelegramMessage(telegramBot, parameters.TelegramChatId, messageFormat(msg, true))
+
+			if twitterBot != nil {
+				sendTwitterPost(twitterBot, messageFormat(msg, false))
+			}
 		//telegramMessageFormat(<-chMessages)
-	}
-}
-
-func consumerCex() {
-
-	for {
-		msg := <-chMessagesCex
-
-		sendTelegramMessage(telegramBot, parameters.TelegramChatId, formatCexMessage(msg))
-
-		if twitterBot != nil {
-			sendTwitterPost(twitterBot, formatCexMessage(msg))
+		default:
+			time.Sleep(500 * time.Millisecond)
 		}
-		//formatCexMessage(<-chMessagesCex)
+
 	}
 }
