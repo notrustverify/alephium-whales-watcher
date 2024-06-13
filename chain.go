@@ -202,7 +202,7 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 							log.Printf("Cannot parse ayin amount, err: %s\n", err)
 							return
 						}
-						if tokenAmount >= parameters.MinAmountAyinTrigger {
+						if tokenAmount/float64(1e18) >= parameters.MinAmountAyinTrigger {
 							if addressIn != addressOut {
 								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, "AYIN"}
 							}
