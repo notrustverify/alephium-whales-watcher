@@ -46,7 +46,9 @@ type Transaction struct {
 	Coinbase          bool   `json:"coinbase"`
 }
 
+
 func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context, fromTs int64, toTs int64, ch chan string) {
+
 	blocks, r, err := apiClient.BlockflowApi.GetBlockflowBlocks(*ctx).FromTs(fromTs).ToTs(toTs).Execute()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error when calling `BlockflowApi.GetBlockflowBlocks``: %v\n", err)
@@ -59,17 +61,20 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 		block := blocks.Blocks[group]
 		wg.Add(1)
 		go getTxId(&block, &wg, ch)
+
 	}
 	wg.Wait()
 }
 
 func getTxId(block *[]openapiclient.BlockEntry, wg *sync.WaitGroup, chTxs chan string) {
+
 	defer wg.Done()
 
 	for _, txs := range *block {
 		for _, tx := range txs.Transactions {
 			if len(tx.Unsigned.Inputs) > 0 {
 				txId := tx.Unsigned.TxId
+
 				chTxs <- txId
 			}
 		}
@@ -111,6 +116,7 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 	var txData Transaction
 	cntRetry := 0
 	log.Printf("worker %d check %s\n", wId, txId)
+
 
 	for {
 

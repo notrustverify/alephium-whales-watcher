@@ -42,6 +42,7 @@ type Parameters struct {
 	PriceUrl                 string
 }
 
+
 var telegramBot *telego.Bot
 var twitterBot *gotwi.Client
 var KnownWallets []KnownWallet
@@ -75,6 +76,7 @@ func main() {
 
 	//chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
+
 	updateKnownWallet()
 	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
 	//KnownWallets = append(KnownWallets, testWallet...)
@@ -83,6 +85,7 @@ func main() {
 	//telegramBot := initTelegram()
 	//defer cancel()
 	//telegramBot.Start(ctx)
+
 
 	telegramBot = initTelegram()
 	var err error
@@ -96,6 +99,7 @@ func main() {
 
 	//	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
+
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 	for w := 1; w <= 5; w++ {
 		go checkTx(chTxs, chMessages, w)
@@ -103,6 +107,8 @@ func main() {
 	}
 
 	go getCexTrades(chMessagesCex)
+
+	go getCexTrades()
 
 	for {
 		t := time.Now().Unix()
@@ -119,6 +125,7 @@ func checkTx(ch chan string, msgCh chan Message, wId int) {
 		select {
 		case tx := <-ch:
 			getTxData(tx, msgCh, wId)
+
 		default:
 			time.Sleep(500 * time.Millisecond)
 		}
@@ -128,9 +135,11 @@ func checkTx(ch chan string, msgCh chan Message, wId int) {
 func getCexTrades(msgCh chan MessageCex) {
 	for {
 		t := time.Now().Unix()
+
 		getTradesGate(t-parameters.PollingIntervalSec, t, msgCh)
 		getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
 		getTradesBitget(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
+
 		log.Println("CEX - Sleepy sleepy")
 		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)
 	}
