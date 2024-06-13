@@ -9,7 +9,7 @@ import (
 	"github.com/gateio/gateapi-go/v6"
 )
 
-func getTradesGate(from int64, to int64) {
+func getTradesGate(from int64, to int64, chMessagesCex chan MessageCex) {
 
 	client := gateapi.NewAPIClient(gateapi.NewConfiguration())
 	// uncomment the next line if your are testing against testnet

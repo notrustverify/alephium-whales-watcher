@@ -21,7 +21,7 @@ type BitgetAggTrades struct {
 	} `json:"data"`
 }
 
-func getTradesBitget(from int64, to int64) {
+func getTradesBitget(from int64, to int64, chMessagesCex chan MessageCex) {
 
 	var trades BitgetAggTrades
 	dataBytes, _, err := getHttp(fmt.Sprintf("https://api.bitget.com/api/v2/spot/market/fills-history?symbol=ALPHUSDT&limit=1000&startTime=%d&endTime=%d", from, to))

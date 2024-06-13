@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -42,11 +43,6 @@ type Parameters struct {
 	PriceUrl                 string
 }
 
-var chMessages chan Message
-var chMessagesCex chan MessageCex
-
-var chTxs chan string
-
 var telegramBot *telego.Bot
 var twitterBot *gotwi.Client
 var KnownWallets []KnownWallet
@@ -74,9 +70,11 @@ func main() {
 	rand.NewSource(time.Now().UnixNano())
 	getRndArticles()
 
-	chMessages = make(chan Message, 100)
-	chMessagesCex = make(chan MessageCex, 100)
-	chTxs = make(chan string, 100)
+	chMessages := make(chan Message, 100)
+	chMessagesCex := make(chan MessageCex, 100)
+	chTxs := make(chan string, 100)
+
+	//chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
 	updateKnownWallet()
 	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
@@ -86,9 +84,6 @@ func main() {
 	//telegramBot := initTelegram()
 	//defer cancel()
 	//telegramBot.Start(ctx)
-
-	go messageConsumer()
-	go checkTx()
 
 	telegramBot = initTelegram()
 	var err error
@@ -100,40 +95,46 @@ func main() {
 
 	//log.Printf("%+v\n", knownWallets)
 
-	//chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+	//	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 
-	go getCexTrades()
+	go getCexTrades(chMessagesCex)
+
+	for i := range 10 {
+		fmt.Printf("Starting worker %d\n", i)
+		go checkTx(chTxs, chMessages)
+		go messageConsumer(chMessagesCex, chMessages)
+
+	}
 
 	for {
 		t := time.Now().Unix()
-		getBlocksFullnode(apiClient, &ctxAlephium, t*1000-parameters.PollingIntervalSec*1000, t*1000)
+		getBlocksFullnode(apiClient, &ctxAlephium, t*1000-parameters.PollingIntervalSec*1000, t*1000, chTxs)
 		log.Println("Sleepy sleepy")
 		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)
-
 	}
 
 }
 
-func checkTx() {
+func checkTx(ch chan string, msgCh chan Message) {
 	for {
 
 		select {
-		case tx := <-chTxs:
-			getTxData(tx)
+		case tx := <-ch:
+			getTxData(tx, msgCh)
 		default:
 			time.Sleep(500 * time.Millisecond)
 		}
 	}
 }
 
-func getCexTrades() {
+func getCexTrades(msgCh chan MessageCex) {
 	for {
 		t := time.Now().Unix()
-		getTradesGate(t-parameters.PollingIntervalSec, t)
-		getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000)
-		getTradesBitget(t*1000-parameters.PollingIntervalSec*1000, t*1000)
+		getTradesGate(t-parameters.PollingIntervalSec, t, msgCh)
+		getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
+		getTradesBitget(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
 		log.Println("CEX - Sleepy sleepy")
 		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)
 	}
@@ -172,7 +173,7 @@ func initTwitter() (*gotwi.Client, error) {
 	return gotwi.NewClient(in)
 }
 
-func messageConsumer() {
+func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message) {
 
 	for {
 
