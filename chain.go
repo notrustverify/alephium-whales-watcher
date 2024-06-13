@@ -37,13 +37,29 @@ type Transaction struct {
 		Key            string `json:"key"`
 		AttoAlphAmount string `json:"attoAlphAmount"`
 		Address        string `json:"address"`
-		Message        string `json:"message"`
-		Spent          string `json:"spent"`
+		Tokens         []struct {
+			ID     string `json:"id"`
+			Amount string `json:"amount"`
+		} `json:"tokens,omitempty"`
+		Message string `json:"message"`
+		Spent   string `json:"spent"`
 	} `json:"outputs"`
 	GasAmount         int    `json:"gasAmount"`
 	GasPrice          string `json:"gasPrice"`
 	ScriptExecutionOk bool   `json:"scriptExecutionOk"`
 	Coinbase          bool   `json:"coinbase"`
+}
+
+type TokenList struct {
+	NetworkID int `json:"networkId"`
+	Tokens    []struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Symbol      string `json:"symbol"`
+		Decimals    int    `json:"decimals"`
+		Description string `json:"description"`
+		LogoURI     string `json:"logoURI"`
+	} `json:"tokens"`
 }
 
 const maxRetryFullnode = 10
@@ -174,9 +190,27 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 						fmt.Fprintf(os.Stderr, "Error when calling BlockflowApi.GetBlockflowBlocks: %v\n", err)
 					}
 					//log.Printf("From %s to %s -> %+v\n", addressIn, addressOut, attoStrToFloat/BASE_ALPH)
-					chMessages <- Message{addressIn, addressOut, hintAmountALPH, txId}
+					chMessages <- Message{addressIn, addressOut, hintAmountALPH, txId, "ALPH"}
 				}
 			}
+
+			if len(txData.Outputs[outputIndex].Tokens) > 0 {
+				for _, token := range txData.Outputs[outputIndex].Tokens {
+					if token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" {
+						tokenAmount, err := strconv.ParseFloat(token.Amount, 64)
+						if err != nil {
+							log.Printf("Cannot parse ayin amount, err: %s\n", err)
+							return
+						}
+						if tokenAmount >= parameters.MinAmountAyinTrigger {
+							if addressIn != addressOut {
+								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, "AYIN"}
+							}
+						}
+					}
+				}
+			}
+
 		}
 	}
 }

@@ -18,6 +18,7 @@ type Message struct {
 	to     string
 	amount float64
 	txId   string
+	symbol string
 }
 
 type MessageCex struct {
@@ -37,14 +38,18 @@ type Parameters struct {
 	FullnodeApi              string
 	FrontendExplorerUrl      string
 	MinAmountTrigger         float64
+	MinAmountAyinTrigger     float64
 	PollingIntervalSec       int64
 	KnownWalletUrl           string
 	PriceUrl                 string
+	TokenListUrl             string
 }
 
 var telegramBot *telego.Bot
 var twitterBot *gotwi.Client
 var KnownWallets []KnownWallet
+var Tokens []TokenList
+
 var parameters Parameters
 
 func main() {
@@ -65,6 +70,7 @@ func main() {
 
 	cronScheduler.Every("5m").Do(updatePrice)
 	cronScheduler.Every("1h").Do(updateKnownWallet)
+	cronScheduler.Every("1h").Do(updateTokens)
 	cronScheduler.StartAsync()
 	rand.NewSource(time.Now().UnixNano())
 	getRndArticles()
@@ -94,10 +100,13 @@ func main() {
 
 	//log.Printf("%+v\n", knownWallets)
 
-	//	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+	//chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+
+	// ayin test
+	chTxs <- "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
-	for w := 1; w <= 10; w++ {
+	for w := 1; w <= 1; w++ {
 		go checkTx(chTxs, chMessages, w)
 		go messageConsumer(chMessagesCex, chMessages)
 	}

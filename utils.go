@@ -66,13 +66,20 @@ func loadEnv() {
 	parameters.FrontendExplorerUrl = os.Getenv("FRONTEND_EXPLORER")
 	parameters.KnownWalletUrl = os.Getenv("KNOWN_WALLETS_URL")
 	parameters.PriceUrl = os.Getenv("PRICE_URL")
+	parameters.TokenListUrl = os.Getenv("TOKEN_LIST_URL")
 
 	minAmountTriggerFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_TRIGGER"), 64)
 	if err != nil {
 		log.Printf("error getting min amount trigger from env, err: %s", err)
 		minAmountTriggerFloat = 5000
 	}
+	minAmountTriggerAyinFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_AYIN_TRIGGER"), 64)
+	if err != nil {
+		log.Printf("error getting min amount trigger from env, err: %s", err)
+		minAmountTriggerFloat = 500
+	}
 	parameters.MinAmountTrigger = minAmountTriggerFloat
+	parameters.MinAmountAyinTrigger = minAmountTriggerAyinFloat
 
 	pollingIntervalSecInt, err := strconv.ParseInt(os.Getenv("POLLING_INTERVAL_SEC"), 10, 64)
 	if err != nil {
@@ -137,24 +144,31 @@ func getRndArticles() CsvArticles {
 
 func messageFormat(msg Message, isTelegram bool) string {
 
-	humanFormatAmount := fmt.Sprintf("%.f ALPH", msg.amount)
+	amountChain := msg.amount
 	namedWalletFrom := getAddressName(&msg.from)
 	namedWalletTo := getAddressName(&msg.to)
 
-	if math.Round(msg.amount) >= 1000.0 {
-		humanFormatAmount = fmt.Sprintf("%.2f K ALPH", msg.amount/1000.0)
-	} else if math.Round(msg.amount) >= 1e6 {
-		humanFormatAmount = fmt.Sprintf("%.2f M ALPH", msg.amount/float64(1e6))
+	if msg.symbol == "AYIN" {
+		amountChain = msg.amount / float64(1e18)
 	}
 
-	amountFiat := msg.amount * coinGeckoPrice
-	amountFiatString := fmt.Sprintf("%.2f USDT", amountFiat)
-	if math.Round(amountFiat) >= 1000.0 {
-		amountFiatString = fmt.Sprintf("%.2f K USDT", amountFiat/1000.0)
-	} else if math.Round(amountFiat) >= 1e6 {
-		amountFiatString = fmt.Sprintf("%.2f M USDT", amountFiat/float64(1e6))
+	humanFormatAmount := fmt.Sprintf("%.f", amountChain)
+	if math.Round(amountChain) >= 1000.0 {
+		humanFormatAmount = fmt.Sprintf("%.2f K", amountChain/1000.0)
+	} else if math.Round(amountChain) >= 1e6 {
+		humanFormatAmount = fmt.Sprintf("%.2f M", amountChain/float64(1e6))
 	}
 
+	var amountFiatString string
+	if msg.symbol == "ALPH" {
+		amountFiat := amountChain * coinGeckoPrice
+		amountFiatString = fmt.Sprintf("(%.2f USDT)", amountFiat)
+		if math.Round(amountFiat) >= 1000.0 {
+			amountFiatString = fmt.Sprintf("(%.2f K USDT)", amountFiat/1000.0)
+		} else if math.Round(amountFiat) >= 1e6 {
+			amountFiatString = fmt.Sprintf("(%.2f M USDT)", amountFiat/float64(1e6))
+		}
+	}
 	addrFrom, alertEmojiFrom := formatAddress(&namedWalletFrom, msg.from, msg.amount, false)
 	addrTo, alertEmojiTo := formatAddress(&namedWalletTo, msg.to, msg.amount, true)
 
@@ -169,13 +183,13 @@ func messageFormat(msg Message, isTelegram bool) string {
 
 	var text string
 	if isTelegram {
-		text = fmt.Sprintf("%s %s transferred\n%s to %s (%s)\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", alertEmoji, humanFormatAmount, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+		text = fmt.Sprintf("%s %s $%s transferred\n%s to %s %s\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", alertEmoji, humanFormatAmount, msg.symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
 
 		rndArticle := getRndArticles()
 		text += fmt.Sprintf("Featured article: <a href='%s'>%s</a>", rndArticle.Url, rndArticle.Title)
 
 	} else {
-		text = fmt.Sprintf("%s %s transferred\n%s to %s (%s)\n\n%s/#/transactions/%s\n", alertEmoji, humanFormatAmount, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+		text = fmt.Sprintf("%s %s %s transferred\n%s to %s %s\n\n%s/#/transactions/%s\n", alertEmoji, humanFormatAmount, msg.symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
 
 		rndArticle := getRndArticles()
 		text += fmt.Sprintf("Feat. article: %s", rndArticle.Url)
@@ -289,11 +303,6 @@ func sendTwitterPost(c *gotwi.Client, text string) (string, error) {
 	return gotwi.StringValue(res.Data.ID), nil
 }
 
-func removeElement(a []string, indexToRemove int) []string {
-	a[indexToRemove] = a[len(a)-1]
-	return a[:len(a)-1]
-}
-
 func updatePrice() {
 	dataBytes, _, err := getHttp(parameters.PriceUrl)
 	if err != nil {
@@ -315,5 +324,15 @@ func updateKnownWallet() {
 	}
 
 	json.Unmarshal(dataBytes, &KnownWallets)
+
+}
+
+func updateTokens() {
+	dataBytes, _, err := getHttp(parameters.TokenListUrl)
+	if err != nil {
+		log.Printf("Error getting know wallet\n%s\n", err)
+	}
+
+	json.Unmarshal(dataBytes, &Tokens)
 
 }
