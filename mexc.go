@@ -17,7 +17,7 @@ type MexcAggTrades []struct {
 	TradeType    string      `json:"tradeType"`
 }
 
-func getTradesMexc(from int64, to int64) {
+func getTradesMexc(from int64, to int64, chMessagesCex chan MessageCex) {
 
 	var trades MexcAggTrades
 	dataBytes, _, err := getHttp("https://api.mexc.com/api/v3/trades/?symbol=ALPHUSDT")

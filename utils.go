@@ -85,7 +85,7 @@ func loadEnv() {
 
 func getHttp(url string) ([]byte, int, error) {
 	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 10
+	retryClient.RetryMax = 3
 	retryClient.Logger = nil
 	resp, err := retryClient.Get(url)
 
