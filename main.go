@@ -123,6 +123,7 @@ func getChain(apiClient *openapiclient.APIClient, ctxAlephium context.Context, c
 	for {
 		t := time.Now().Unix()
 		getBlocksFullnode(apiClient, &ctxAlephium, t*1000-parameters.PollingIntervalSec*1000, t*1000, chTxs)
+
 		log.Println("Sleepy sleepy")
 		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)
 	}
@@ -132,9 +133,9 @@ func getCexTrades(msgCh chan MessageCex) {
 	for {
 		t := time.Now().Unix()
 
-		getTradesGate(t-parameters.PollingIntervalSec, t, msgCh)
-		getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
-		getTradesBitget(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
+		go getTradesGate(t-parameters.PollingIntervalSec, t, msgCh)
+		go getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
+		go getTradesBitget(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
 
 		log.Println("CEX - Sleepy sleepy")
 		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)

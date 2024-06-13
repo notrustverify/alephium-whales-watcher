@@ -46,13 +46,29 @@ type Transaction struct {
 	Coinbase          bool   `json:"coinbase"`
 }
 
+const maxRetryFullnode = 10
 
 func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context, fromTs int64, toTs int64, ch chan string) {
+	cntRetry := 0
+	var blocks *openapiclient.BlocksPerTimeStampRange
 
-	blocks, r, err := apiClient.BlockflowApi.GetBlockflowBlocks(*ctx).FromTs(fromTs).ToTs(toTs).Execute()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error when calling `BlockflowApi.GetBlockflowBlocks``: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	for {
+		blocksFullnode, r, err := apiClient.BlockflowApi.GetBlockflowBlocks(*ctx).FromTs(fromTs).ToTs(toTs).Execute()
+		if err != nil {
+			cntRetry++
+		}
+
+		if err == nil {
+			blocks = blocksFullnode
+			break
+		}
+
+		if cntRetry >= maxRetryFullnode {
+			fmt.Fprintf(os.Stderr, "Error when calling `BlockflowApi.GetBlockflowBlocks``: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+			panic(err)
+		}
+		time.Sleep(1 * time.Second)
 	}
 
 	wg := sync.WaitGroup{}
@@ -64,6 +80,7 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 
 	}
 	wg.Wait()
+
 }
 
 func getTxId(block *[]openapiclient.BlockEntry, wg *sync.WaitGroup, chTxs chan string) {
@@ -92,15 +109,16 @@ func getTxStateExplorer(txId string, tx *Transaction) bool {
 	}
 
 	if statusCode != 404 && statusCode != 200 {
-		log.Printf("Unknown error code from explorer: status code %d\n", statusCode)
-		return false
+		fmt.Fprintf(os.Stderr, "Error fullnode explorer getting status: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Status code: %d\n", statusCode)
+		panic(err)
 	}
 
 	if statusCode == 200 && len(dataBytes) > 0 {
 		err := json.Unmarshal(dataBytes, &tx)
 		if err != nil {
-			log.Printf("Cannot unmarshall data, err: %s\n", err)
-			panic(1)
+			fmt.Fprintf(os.Stderr, "Cannot unmarshall data, err: %s\n", err)
+			panic(err)
 		}
 	}
 
@@ -116,7 +134,6 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 	var txData Transaction
 	cntRetry := 0
 	log.Printf("worker %d check %s\n", wId, txId)
-
 
 	for {
 

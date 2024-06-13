@@ -26,22 +26,21 @@ func getTradesGate(from int64, to int64, chMessagesCex chan MessageCex) {
 			log.Printf("generic error: %s\n", err.Error())
 			return
 		}
-	} else {
+	}
 
-		for _, v := range result {
-			amountToFloat, err := strconv.ParseFloat(v.Amount, 64)
-			if err != nil {
-				log.Printf("Cannot convert gateio amount, err: %s\n", err)
-			}
+	for _, v := range result {
+		amountToFloat, err := strconv.ParseFloat(v.Amount, 64)
+		if err != nil {
+			log.Printf("Cannot convert gateio amount, err: %s\n", err)
+		}
 
-			priceToFloat, err := strconv.ParseFloat(v.Price, 64)
-			if err != nil {
-				log.Printf("Cannot convert gateio price, err: %s\n", err)
-			}
+		priceToFloat, err := strconv.ParseFloat(v.Price, 64)
+		if err != nil {
+			log.Printf("Cannot convert gateio price, err: %s\n", err)
+		}
 
-			if amountToFloat >= parameters.MinAmountTrigger {
-				chMessagesCex <- MessageCex{v.Side, amountToFloat, amountToFloat * priceToFloat, "Gateio", priceToFloat}
-			}
+		if amountToFloat >= parameters.MinAmountTrigger {
+			chMessagesCex <- MessageCex{v.Side, amountToFloat, amountToFloat * priceToFloat, "Gateio", priceToFloat}
 		}
 	}
 
