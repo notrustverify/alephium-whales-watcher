@@ -110,8 +110,9 @@ func getTxStateExplorer(txId string, tx *Transaction) bool {
 func getTxData(txId string, chMessages chan Message, wId int) {
 	var txData Transaction
 	cntRetry := 0
+	log.Printf("worker %d check %s\n", wId, txId)
+
 	for {
-		log.Printf("worker %d check %s\n", wId, txId)
 
 		if getTxStateExplorer(txId, &txData) {
 			break
