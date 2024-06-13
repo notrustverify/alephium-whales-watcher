@@ -70,7 +70,6 @@ func getTxId(block *[]openapiclient.BlockEntry, wg *sync.WaitGroup, chTxs chan s
 		for _, tx := range txs.Transactions {
 			if len(tx.Unsigned.Inputs) > 0 {
 				txId := tx.Unsigned.TxId
-				fmt.Println(txId)
 				chTxs <- txId
 			}
 		}
@@ -108,11 +107,11 @@ func getTxStateExplorer(txId string, tx *Transaction) bool {
 
 }
 
-func getTxData(txId string, chMessages chan Message) {
+func getTxData(txId string, chMessages chan Message, wId int) {
 	var txData Transaction
 	cntRetry := 0
-
 	for {
+		log.Printf("worker %d check %s\n", wId, txId)
 
 		if getTxStateExplorer(txId, &txData) {
 			break

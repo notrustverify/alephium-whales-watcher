@@ -40,4 +40,5 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.54.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
+	golang.org/x/sync v0.7.0
 )

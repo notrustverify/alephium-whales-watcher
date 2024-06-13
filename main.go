@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -98,15 +97,12 @@ func main() {
 	//	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
+	for w := 1; w <= 5; w++ {
+		go checkTx(chTxs, chMessages, w)
+		go messageConsumer(chMessagesCex, chMessages)
+	}
 
 	go getCexTrades(chMessagesCex)
-
-	for i := range 10 {
-		fmt.Printf("Starting worker %d\n", i)
-		go checkTx(chTxs, chMessages)
-		go messageConsumer(chMessagesCex, chMessages)
-
-	}
 
 	for {
 		t := time.Now().Unix()
@@ -117,12 +113,12 @@ func main() {
 
 }
 
-func checkTx(ch chan string, msgCh chan Message) {
+func checkTx(ch chan string, msgCh chan Message, wId int) {
 	for {
 
 		select {
 		case tx := <-ch:
-			getTxData(tx, msgCh)
+			getTxData(tx, msgCh, wId)
 		default:
 			time.Sleep(500 * time.Millisecond)
 		}
