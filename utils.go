@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"slices"
@@ -21,7 +22,7 @@ import (
 	"github.com/mymmrac/telego"
 )
 
-const BASE_ALPH = 1e18
+const baseAlph = 1e18
 
 var coinGeckoPrice float64
 
@@ -136,22 +137,21 @@ func getRndArticles() CsvArticles {
 
 func messageFormat(msg Message, isTelegram bool) string {
 
-	humanFormatAmount := fmt.Sprintf("%.2f ALPH", msg.amount)
+	humanFormatAmount := fmt.Sprintf("%.f ALPH", msg.amount)
 	namedWalletFrom := getAddressName(&msg.from)
 	namedWalletTo := getAddressName(&msg.to)
 
-	if msg.amount >= 1000 {
+	if math.Round(msg.amount) >= 1000.0 {
 		humanFormatAmount = fmt.Sprintf("%.2f K ALPH", msg.amount/1000.0)
-
-	} else if msg.amount >= 1e6 {
+	} else if math.Round(msg.amount) >= 1e6 {
 		humanFormatAmount = fmt.Sprintf("%.2f M ALPH", msg.amount/float64(1e6))
 	}
 
 	amountFiat := msg.amount * coinGeckoPrice
 	amountFiatString := fmt.Sprintf("%.2f USDT", amountFiat)
-	if amountFiat >= 1000 {
+	if math.Round(amountFiat) >= 1000.0 {
 		amountFiatString = fmt.Sprintf("%.2f K USDT", amountFiat/1000.0)
-	} else if amountFiat >= 1e6 {
+	} else if math.Round(amountFiat) >= 1e6 {
 		amountFiatString = fmt.Sprintf("%.2f M USDT", amountFiat/float64(1e6))
 	}
 
@@ -240,7 +240,7 @@ func formatCexMessage(msg MessageCex) string {
 
 func humanizeAmount(amount float64, symbol string) string {
 	amountStr := fmt.Sprintf("%.2f %s", amount, symbol)
-	if amount >= 1000 {
+	if amount >= 1000.0 {
 		amountStr = fmt.Sprintf("%.2f K %s", amount/1000.0, symbol)
 	} else if amount >= 1e6 {
 		amountStr = fmt.Sprintf("%.2f M %s", amount/float64(1e6), symbol)
