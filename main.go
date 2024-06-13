@@ -14,11 +14,11 @@ import (
 )
 
 type Message struct {
-	from   string
-	to     string
-	amount float64
-	txId   string
-	symbol string
+	from      string
+	to        string
+	amount    float64
+	txId      string
+	tokenData Token
 }
 
 type MessageCex struct {
@@ -48,7 +48,7 @@ type Parameters struct {
 var telegramBot *telego.Bot
 var twitterBot *gotwi.Client
 var KnownWallets []KnownWallet
-var Tokens []TokenList
+var Tokens TokenList
 
 var parameters Parameters
 
@@ -74,12 +74,11 @@ func main() {
 	cronScheduler.StartAsync()
 	rand.NewSource(time.Now().UnixNano())
 	getRndArticles()
+	updateTokens()
 
 	chMessages := make(chan Message, 100)
 	chMessagesCex := make(chan MessageCex, 100)
 	chTxs := make(chan string, 100)
-
-	//chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
 	updateKnownWallet()
 	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
@@ -100,10 +99,10 @@ func main() {
 
 	//log.Printf("%+v\n", knownWallets)
 
-	//chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
 	// ayin test
-	//chTxs <- "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"
+	chTxs <- "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 	for w := 1; w <= 1; w++ {

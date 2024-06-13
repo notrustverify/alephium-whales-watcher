@@ -148,8 +148,14 @@ func messageFormat(msg Message, isTelegram bool) string {
 	namedWalletFrom := getAddressName(&msg.from)
 	namedWalletTo := getAddressName(&msg.to)
 
-	if msg.symbol == "AYIN" {
-		amountChain = msg.amount / float64(1e18)
+	symbol := msg.tokenData.Symbol
+	if msg.tokenData.Name == "" {
+		symbol = "ALPH"
+	}
+
+	if symbol != "ALPH" {
+		decimal := float64(msg.tokenData.Decimals)
+		amountChain = msg.amount / math.Pow(10.0, decimal)
 	}
 
 	humanFormatAmount := fmt.Sprintf("%.f", amountChain)
@@ -160,7 +166,7 @@ func messageFormat(msg Message, isTelegram bool) string {
 	}
 
 	var amountFiatString string
-	if msg.symbol == "ALPH" {
+	if symbol == "ALPH" {
 		amountFiat := amountChain * coinGeckoPrice
 		amountFiatString = fmt.Sprintf("(%.2f USDT)", amountFiat)
 		if math.Round(amountFiat) >= 1000.0 {
@@ -183,13 +189,13 @@ func messageFormat(msg Message, isTelegram bool) string {
 
 	var text string
 	if isTelegram {
-		text = fmt.Sprintf("%s %s $%s transferred\n%s to %s %s\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", alertEmoji, humanFormatAmount, msg.symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+		text = fmt.Sprintf("%s %s $%s transferred\n%s to %s %s\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", alertEmoji, humanFormatAmount, symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
 
 		rndArticle := getRndArticles()
 		text += fmt.Sprintf("Featured article: <a href='%s'>%s</a>", rndArticle.Url, rndArticle.Title)
 
 	} else {
-		text = fmt.Sprintf("%s %s %s transferred\n%s to %s %s\n\n%s/#/transactions/%s\n", alertEmoji, humanFormatAmount, msg.symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+		text = fmt.Sprintf("%s %s %s transferred\n%s to %s %s\n\n%s/#/transactions/%s\n", alertEmoji, humanFormatAmount, symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
 
 		rndArticle := getRndArticles()
 		text += fmt.Sprintf("Feat. article: %s", rndArticle.Url)
@@ -335,4 +341,14 @@ func updateTokens() {
 
 	json.Unmarshal(dataBytes, &Tokens)
 
+}
+
+func searchTokenData(contractId string) Token {
+	for _, item := range Tokens.Tokens {
+		if item.ID == contractId {
+			return item
+		}
+
+	}
+	return Token{}
 }

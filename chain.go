@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -50,16 +51,18 @@ type Transaction struct {
 	Coinbase          bool   `json:"coinbase"`
 }
 
+type Token struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Symbol      string `json:"symbol"`
+	Decimals    int    `json:"decimals"`
+	Description string `json:"description"`
+	LogoURI     string `json:"logoURI"`
+}
+
 type TokenList struct {
-	NetworkID int `json:"networkId"`
-	Tokens    []struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Symbol      string `json:"symbol"`
-		Decimals    int    `json:"decimals"`
-		Description string `json:"description"`
-		LogoURI     string `json:"logoURI"`
-	} `json:"tokens"`
+	NetworkID int     `json:"networkId"`
+	Tokens    []Token `json:"tokens"`
 }
 
 const maxRetryFullnode = 10
@@ -190,21 +193,33 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 						fmt.Fprintf(os.Stderr, "Error when calling BlockflowApi.GetBlockflowBlocks: %v\n", err)
 					}
 					//log.Printf("From %s to %s -> %+v\n", addressIn, addressOut, attoStrToFloat/BASE_ALPH)
-					chMessages <- Message{addressIn, addressOut, hintAmountALPH, txId, "ALPH"}
+					chMessages <- Message{addressIn, addressOut, hintAmountALPH, txId, Token{}}
 				}
 			}
 
 			if len(txData.Outputs[outputIndex].Tokens) > 0 {
 				for _, token := range txData.Outputs[outputIndex].Tokens {
+
+					// ayin
 					if token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" {
+						tokenData := searchTokenData(token.ID)
+						if tokenData.Name == "" {
+							log.Printf("error cannot found info tfor token %s", token.ID)
+						}
+						fmt.Printf("%+v\n", tokenData)
+
 						tokenAmount, err := strconv.ParseFloat(token.Amount, 64)
 						if err != nil {
 							log.Printf("Cannot parse ayin amount, err: %s\n", err)
 							return
 						}
-						if tokenAmount/float64(1e18) >= parameters.MinAmountAyinTrigger {
+
+						decimal := float64(tokenData.Decimals)
+						amount := tokenAmount / math.Pow(10.0, decimal)
+
+						if amount >= parameters.MinAmountAyinTrigger {
 							if addressIn != addressOut {
-								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, "AYIN"}
+								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
 							}
 						}
 					}
