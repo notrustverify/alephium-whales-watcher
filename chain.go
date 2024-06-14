@@ -228,12 +228,6 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 							}
 						}
 
-						if amount >= parameters.MinAmountUsdtTrigger && (token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" || token.ID == "722954d9067c5a5ad532746a024f2a9d7a18ed9b90e27d0a3a504962160b5600") {
-							if addressIn != addressOut {
-								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
-							}
-						}
-
 						if amount >= parameters.MinAmountEthTrigger && token.ID == "19246e8c2899bc258a1156e08466e3cdd3323da756d8a543c7fc911847b96f00" {
 							if addressIn != addressOut {
 								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
