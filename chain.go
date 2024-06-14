@@ -200,9 +200,7 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 			if len(txData.Outputs[outputIndex].Tokens) > 0 {
 				for _, token := range txData.Outputs[outputIndex].Tokens {
 
-					fmt.Printf("%+v", trackTokens)
 					if amountTrigger, found := trackTokens[token.ID]; found {
-						fmt.Println(trackTokens[token.ID])
 						tokenData := searchTokenData(token.ID)
 						if tokenData.Name == "" {
 							log.Printf("error cannot found info for token %s", token.ID)

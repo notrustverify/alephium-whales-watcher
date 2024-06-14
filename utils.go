@@ -382,7 +382,9 @@ func loadTokensToTrack() {
 	trackTokens = make(map[string]float64)
 	tokensEnv := strings.Split(os.Getenv("TOKENS"), ",")
 
+	// load token amount trigger
 	for _, token := range tokensEnv {
+
 		tokenId := strings.Split(token, ";")[0]
 		amountTrigger, err := strconv.ParseFloat(strings.Split(token, ";")[1], 64)
 		if err != nil {
