@@ -201,12 +201,11 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 				for _, token := range txData.Outputs[outputIndex].Tokens {
 
 					// ayin usdt
-					if token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" || token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" {
+					if token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" || token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" || token.ID == "722954d9067c5a5ad532746a024f2a9d7a18ed9b90e27d0a3a504962160b5600" {
 						tokenData := searchTokenData(token.ID)
 						if tokenData.Name == "" {
 							log.Printf("error cannot found info for token %s", token.ID)
 						}
-						fmt.Printf("%+v\n", tokenData)
 
 						tokenAmount, err := strconv.ParseFloat(token.Amount, 64)
 						if err != nil {
@@ -222,7 +221,26 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
 							}
 						}
-						if amount >= parameters.MinAmountUsdtTrigger && token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" {
+
+						if amount >= parameters.MinAmountUsdtTrigger && (token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" || token.ID == "722954d9067c5a5ad532746a024f2a9d7a18ed9b90e27d0a3a504962160b5600") {
+							if addressIn != addressOut {
+								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
+							}
+						}
+
+						if amount >= parameters.MinAmountUsdtTrigger && (token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" || token.ID == "722954d9067c5a5ad532746a024f2a9d7a18ed9b90e27d0a3a504962160b5600") {
+							if addressIn != addressOut {
+								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
+							}
+						}
+
+						if amount >= parameters.MinAmountEthTrigger && token.ID == "19246e8c2899bc258a1156e08466e3cdd3323da756d8a543c7fc911847b96f00" {
+							if addressIn != addressOut {
+								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
+							}
+						}
+
+						if amount >= parameters.MinAmountBtcTrigger && token.ID == "383bc735a4de6722af80546ec9eeb3cff508f2f68e97da19489ce69f3e703200" {
 							if addressIn != addressOut {
 								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
 							}

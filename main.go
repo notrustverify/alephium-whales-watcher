@@ -40,6 +40,8 @@ type Parameters struct {
 	MinAmountTrigger         float64
 	MinAmountAyinTrigger     float64
 	MinAmountUsdtTrigger     float64
+	MinAmountEthTrigger      float64
+	MinAmountBtcTrigger      float64
 	PollingIntervalSec       int64
 	KnownWalletUrl           string
 	PriceUrl                 string
