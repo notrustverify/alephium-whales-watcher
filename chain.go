@@ -200,11 +200,11 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 			if len(txData.Outputs[outputIndex].Tokens) > 0 {
 				for _, token := range txData.Outputs[outputIndex].Tokens {
 
-					// ayin
-					if token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" {
+					// ayin usdt
+					if token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" || token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" {
 						tokenData := searchTokenData(token.ID)
 						if tokenData.Name == "" {
-							log.Printf("error cannot found info tfor token %s", token.ID)
+							log.Printf("error cannot found info for token %s", token.ID)
 						}
 						fmt.Printf("%+v\n", tokenData)
 
@@ -217,12 +217,18 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 						decimal := float64(tokenData.Decimals)
 						amount := tokenAmount / math.Pow(10.0, decimal)
 
-						if amount >= parameters.MinAmountAyinTrigger {
+						if amount >= parameters.MinAmountAyinTrigger && token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" {
+							if addressIn != addressOut {
+								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
+							}
+						}
+						if amount >= parameters.MinAmountUsdtTrigger && token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" {
 							if addressIn != addressOut {
 								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
 							}
 						}
 					}
+
 				}
 			}
 

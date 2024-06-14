@@ -76,10 +76,18 @@ func loadEnv() {
 	minAmountTriggerAyinFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_AYIN_TRIGGER"), 64)
 	if err != nil {
 		log.Printf("error getting min amount trigger from env, err: %s", err)
-		minAmountTriggerFloat = 500
+		minAmountTriggerAyinFloat = 500
 	}
+
+	minAmountTriggerUsdtFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_USDT_TRIGGER"), 64)
+	if err != nil {
+		log.Printf("error getting min amount trigger from env, err: %s", err)
+		minAmountTriggerUsdtFloat = 5000
+	}
+
 	parameters.MinAmountTrigger = minAmountTriggerFloat
 	parameters.MinAmountAyinTrigger = minAmountTriggerAyinFloat
+	parameters.MinAmountUsdtTrigger = minAmountTriggerUsdtFloat
 
 	pollingIntervalSecInt, err := strconv.ParseInt(os.Getenv("POLLING_INTERVAL_SEC"), 10, 64)
 	if err != nil {
