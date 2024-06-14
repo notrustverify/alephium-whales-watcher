@@ -45,6 +45,8 @@ type CsvArticles struct {
 	Url   string `csv:"url"`
 }
 
+var trackTokens map[string]float64
+
 func loadEnv() {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -373,4 +375,21 @@ func searchTokenData(contractId string) Token {
 
 	}
 	return Token{}
+}
+
+func loadTokensToTrack() {
+
+	trackTokens = make(map[string]float64)
+	tokensEnv := strings.Split(os.Getenv("TOKENS"), ",")
+
+	for _, token := range tokensEnv {
+		tokenId := strings.Split(token, ";")[0]
+		amountTrigger, err := strconv.ParseFloat(strings.Split(token, ";")[1], 64)
+		if err != nil {
+			fmt.Printf("cannot get token trigger amount, %s, err: %s\n", tokenId, err)
+
+		}
+
+		trackTokens[tokenId] = amountTrigger
+	}
 }

@@ -58,6 +58,7 @@ var parameters Parameters
 func main() {
 
 	loadEnv()
+	loadTokensToTrack()
 
 	cronScheduler := gocron.NewScheduler(time.UTC)
 
@@ -108,7 +109,7 @@ func main() {
 	chTxs <- "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"
 
 	// usdt test
-	//chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
+	chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 	for w := 1; w <= 1; w++ {

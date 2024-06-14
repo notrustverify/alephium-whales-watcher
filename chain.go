@@ -200,8 +200,9 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 			if len(txData.Outputs[outputIndex].Tokens) > 0 {
 				for _, token := range txData.Outputs[outputIndex].Tokens {
 
-					// ayin usdt
-					if token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" || token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" || token.ID == "722954d9067c5a5ad532746a024f2a9d7a18ed9b90e27d0a3a504962160b5600" {
+					fmt.Printf("%+v", trackTokens)
+					if amountTrigger, found := trackTokens[token.ID]; found {
+						fmt.Println(trackTokens[token.ID])
 						tokenData := searchTokenData(token.ID)
 						if tokenData.Name == "" {
 							log.Printf("error cannot found info for token %s", token.ID)
@@ -216,25 +217,7 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 						decimal := float64(tokenData.Decimals)
 						amount := tokenAmount / math.Pow(10.0, decimal)
 
-						if amount >= parameters.MinAmountAyinTrigger && token.ID == "1a281053ba8601a658368594da034c2e99a0fb951b86498d05e76aedfe666800" {
-							if addressIn != addressOut {
-								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
-							}
-						}
-
-						if amount >= parameters.MinAmountUsdtTrigger && (token.ID == "556d9582463fe44fbd108aedc9f409f69086dc78d994b88ea6c9e65f8bf98e00" || token.ID == "722954d9067c5a5ad532746a024f2a9d7a18ed9b90e27d0a3a504962160b5600") {
-							if addressIn != addressOut {
-								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
-							}
-						}
-
-						if amount >= parameters.MinAmountEthTrigger && token.ID == "19246e8c2899bc258a1156e08466e3cdd3323da756d8a543c7fc911847b96f00" {
-							if addressIn != addressOut {
-								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
-							}
-						}
-
-						if amount >= parameters.MinAmountBtcTrigger && token.ID == "383bc735a4de6722af80546ec9eeb3cff508f2f68e97da19489ce69f3e703200" {
+						if amount >= float64(amountTrigger) {
 							if addressIn != addressOut {
 								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
 							}
