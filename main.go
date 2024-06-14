@@ -112,7 +112,7 @@ func main() {
 	//chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
-	for w := 1; w <= 1; w++ {
+	for w := 1; w <= 10; w++ {
 		go checkTx(chTxs, chMessages, w)
 		go messageConsumer(chMessagesCex, chMessages)
 	}
