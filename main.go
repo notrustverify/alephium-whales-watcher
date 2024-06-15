@@ -60,6 +60,10 @@ func main() {
 	loadEnv()
 	loadTokensToTrack()
 
+	getRndArticles()
+	updateTokens()
+	updateKnownWallet()
+
 	cronScheduler := gocron.NewScheduler(time.UTC)
 
 	configuration := openapiclient.NewConfiguration()
@@ -77,14 +81,11 @@ func main() {
 	cronScheduler.Every("1h").Do(updateTokens)
 	cronScheduler.StartAsync()
 	rand.NewSource(time.Now().UnixNano())
-	getRndArticles()
-	updateTokens()
 
 	chMessages := make(chan Message, 100)
 	chMessagesCex := make(chan MessageCex, 100)
 	chTxs := make(chan string, 100)
 
-	updateKnownWallet()
 	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
 	//KnownWallets = append(KnownWallets, testWallet...)
 
@@ -110,6 +111,8 @@ func main() {
 
 	// usdt test
 	//chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
+	//wbtc test
+	chTxs <- "90cff504fe44e175817d26f95b48732745a9559ad37659c277780f1941ed2540"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 	for w := 1; w <= 10; w++ {
