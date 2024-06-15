@@ -112,7 +112,7 @@ func main() {
 	// usdt test
 	//chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
 	//wbtc test
-	chTxs <- "90cff504fe44e175817d26f95b48732745a9559ad37659c277780f1941ed2540"
+	//chTxs <- "90cff504fe44e175817d26f95b48732745a9559ad37659c277780f1941ed2540"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 	for w := 1; w <= 10; w++ {
