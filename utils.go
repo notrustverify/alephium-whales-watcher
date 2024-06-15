@@ -182,7 +182,7 @@ func messageFormat(msg Message, isTelegram bool) string {
 		amountChain = msg.amount / math.Pow(10.0, decimal)
 	}
 
-	humanFormatAmount := fmt.Sprintf("%.f", amountChain)
+	humanFormatAmount := fmt.Sprintf("%.2f", amountChain)
 	if amountChain < 1 {
 		humanFormatAmount = fmt.Sprintf("%.3f", amountChain)
 	} else if math.Round(amountChain) >= 1000.0 {
