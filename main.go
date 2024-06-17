@@ -104,10 +104,9 @@ func main() {
 
 	//log.Printf("%+v\n", knownWallets)
 
-	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+	//chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
 
 	// ayin test
-	chTxs <- "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"
 
 	// usdt test
 	//chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
@@ -115,6 +114,9 @@ func main() {
 	//chTxs <- "90cff504fe44e175817d26f95b48732745a9559ad37659c277780f1941ed2540"
 
 	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
+	chTxs <- "8721a9f889f7f2d493ecfd508eeb4ca486623ee28adc3e55f1af433405b5262d"
+	chTxs <- "4667b6ae51d12e1708a37f260cc192dc95b258b1c360549cdc5b4ede8d91d54f"
+
 	for w := 1; w <= 10; w++ {
 		go checkTx(chTxs, chMessages, w)
 		go messageConsumer(chMessagesCex, chMessages)
@@ -122,6 +124,7 @@ func main() {
 
 	go getCexTrades(chMessagesCex)
 	getChain(apiClient, ctxAlephium, chTxs)
+
 }
 
 func checkTx(ch chan string, msgCh chan Message, wId int) {

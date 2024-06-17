@@ -238,6 +238,49 @@ func messageFormat(msg Message, isTelegram bool) string {
 
 }
 
+func messageFormatContract(msg Message, isTelegram bool) string {
+	amountChain := msg.amount
+	namedWalletFrom := getAddressName(&msg.from)
+	namedWalletTo := getAddressName(&msg.to)
+
+	symbol := msg.tokenData.Symbol
+	if msg.tokenData.Name == "" {
+		symbol = "ALPH"
+	}
+
+	if symbol != "ALPH" {
+		decimal := float64(msg.tokenData.Decimals)
+		amountChain = msg.amount / math.Pow(10.0, decimal)
+	}
+
+	humanFormatAmount := humanizeAmount(amountChain, msg.tokenData.Symbol)
+	amountFiatString := ""
+	if symbol == "ALPH" {
+		amountFiatString = humanizeAmount(amountChain*coinGeckoPrice, msg.tokenData.Symbol)
+	}
+
+	addrFrom, _ := formatAddress(&namedWalletFrom, msg.from, msg.amount, false)
+	addrTo, _ := formatAddress(&namedWalletTo, msg.to, msg.amount, true)
+
+	text := ""
+	if isTelegram {
+		text = fmt.Sprintf("📜Contract %s $%s transferred\n%s to %s %s\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", humanFormatAmount, symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+
+		rndArticle := getRndArticles()
+		text += fmt.Sprintf("Featured article: <a href='%s'>%s</a>", rndArticle.Url, rndArticle.Title)
+
+	} else {
+		text = fmt.Sprintf("📜 %s %s transferred\n%s to %s %s\n\n%s/#/transactions/%s\n", humanFormatAmount, symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+
+		rndArticle := getRndArticles()
+		text += fmt.Sprintf("Feat. article: %s", rndArticle.Url)
+		text += "\n\n#alephium"
+
+	}
+
+	return text
+}
+
 func formatAddress(knownWallet *KnownWallet, address string, amount float64, to bool) (string, string) {
 
 	truncated := fmt.Sprintf("%s...%s", address[0:3], address[len(address)-3:])
@@ -286,7 +329,9 @@ func formatCexMessage(msg MessageCex) string {
 
 func humanizeAmount(amount float64, symbol string) string {
 	amountStr := fmt.Sprintf("%.2f %s", amount, symbol)
-	if amount >= 1000.0 {
+	if amount < 1 {
+		amountStr = fmt.Sprintf("%.3f %s", amount, symbol)
+	} else if amount >= 1000.0 {
 		amountStr = fmt.Sprintf("%.2f K %s", amount/1000.0, symbol)
 	} else if amount >= 1e6 {
 		amountStr = fmt.Sprintf("%.2f M %s", amount/float64(1e6), symbol)
