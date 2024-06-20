@@ -51,7 +51,7 @@ func getTradesBitget(from int64, to int64, chMessagesCex chan MessageCex) {
 		}
 
 		if amountToFloat >= parameters.MinAmountTrigger && tsToFloat >= from && tsToFloat <= to {
-			chMessagesCex <- MessageCex{v.Side, amountToFloat, amountToFloat * priceToFloat, "Bitget", priceToFloat}
+			chMessagesCex <- MessageCex{v.Side, Amount{amountToFloat, "ALPH"}, Amount{amountToFloat * priceToFloat, "USDT"}, "Bitget", priceToFloat}
 		}
 	}
 

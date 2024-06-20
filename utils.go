@@ -45,6 +45,26 @@ type CsvArticles struct {
 	Url   string `csv:"url"`
 }
 
+type Amount struct {
+	Value  float64
+	Symbol string
+}
+
+func (a Amount) formatHuman() string {
+	amount := float64(a.Value)
+
+	switch {
+	case amount < 0:
+		return fmt.Sprintf("%.3f %s", amount, a.Symbol)
+	case math.Round(amount) >= 1000.0:
+		return fmt.Sprintf("%.2f K %s", amount/1000.0, a.Symbol)
+	case math.Round(amount) >= 1e6:
+		return fmt.Sprintf("%.2f M %s", amount/float64(1e6), a.Symbol)
+	default:
+		return fmt.Sprintf("%.2f %s", amount, a.Symbol)
+	}
+}
+
 var trackTokens map[string]float64
 
 func loadEnv() {
@@ -70,40 +90,24 @@ func loadEnv() {
 	parameters.PriceUrl = os.Getenv("PRICE_URL")
 	parameters.TokenListUrl = os.Getenv("TOKEN_LIST_URL")
 
+	debugEnv := os.Getenv("DEBUG")
+	parameters.debugMode = false
+	if debugEnv != "" {
+		debugMode, err := strconv.ParseBool(debugEnv)
+		if err != nil {
+			log.Printf("debug mode cannot be parsed, %s", err)
+			parameters.debugMode = false
+		}
+		parameters.debugMode = debugMode
+	}
+
 	minAmountTriggerFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_TRIGGER"), 64)
 	if err != nil {
 		log.Printf("error getting min amount trigger from env, err: %s", err)
 		minAmountTriggerFloat = 5000
 	}
-	minAmountTriggerAyinFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_AYIN_TRIGGER"), 64)
-	if err != nil {
-		log.Printf("error getting min amount trigger from env, err: %s", err)
-		minAmountTriggerAyinFloat = 500
-	}
-
-	minAmountTriggerUsdtFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_USDT_TRIGGER"), 64)
-	if err != nil {
-		log.Printf("error getting min amount trigger from env, err: %s", err)
-		minAmountTriggerUsdtFloat = 5000
-	}
-
-	minAmountTriggerEthFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_USDT_TRIGGER"), 64)
-	if err != nil {
-		log.Printf("error getting min amount trigger from env, err: %s", err)
-		minAmountTriggerEthFloat = 1
-	}
-
-	minAmountTriggerBtcFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_USDT_TRIGGER"), 64)
-	if err != nil {
-		log.Printf("error getting min amount trigger from env, err: %s", err)
-		minAmountTriggerBtcFloat = 0.5
-	}
 
 	parameters.MinAmountTrigger = minAmountTriggerFloat
-	parameters.MinAmountAyinTrigger = minAmountTriggerAyinFloat
-	parameters.MinAmountUsdtTrigger = minAmountTriggerUsdtFloat
-	parameters.MinAmountEthTrigger = minAmountTriggerEthFloat
-	parameters.MinAmountBtcTrigger = minAmountTriggerBtcFloat
 
 	pollingIntervalSecInt, err := strconv.ParseInt(os.Getenv("POLLING_INTERVAL_SEC"), 10, 64)
 	if err != nil {
@@ -168,9 +172,11 @@ func getRndArticles() CsvArticles {
 
 func messageFormat(msg Message, isTelegram bool) string {
 
-	amountChain := msg.amount
+	amountChain := msg.amountChain
 	namedWalletFrom := getAddressName(&msg.from)
 	namedWalletTo := getAddressName(&msg.to)
+
+	var amountFiatString string
 
 	symbol := msg.tokenData.Symbol
 	if msg.tokenData.Name == "" {
@@ -179,30 +185,15 @@ func messageFormat(msg Message, isTelegram bool) string {
 
 	if symbol != "ALPH" {
 		decimal := float64(msg.tokenData.Decimals)
-		amountChain = msg.amount / math.Pow(10.0, decimal)
+		amountChain = msg.amountChain / math.Pow(10.0, decimal)
+		amountFiat := Amount{Value: amountChain * coinGeckoPrice, Symbol: "ALPH"}
+		amountFiatString = amountFiat.formatHuman()
 	}
 
-	humanFormatAmount := fmt.Sprintf("%.2f", amountChain)
-	if amountChain < 1 {
-		humanFormatAmount = fmt.Sprintf("%.3f", amountChain)
-	} else if math.Round(amountChain) >= 1000.0 {
-		humanFormatAmount = fmt.Sprintf("%.2f K", amountChain/1000.0)
-	} else if math.Round(amountChain) >= 1e6 {
-		humanFormatAmount = fmt.Sprintf("%.2f M", amountChain/float64(1e6))
-	}
+	humanFormatAmount := Amount{Value: amountChain, Symbol: symbol}.formatHuman()
 
-	var amountFiatString string
-	if symbol == "ALPH" {
-		amountFiat := amountChain * coinGeckoPrice
-		amountFiatString = fmt.Sprintf("(%.2f USDT)", amountFiat)
-		if math.Round(amountFiat) >= 1000.0 {
-			amountFiatString = fmt.Sprintf("(%.2f K USDT)", amountFiat/1000.0)
-		} else if math.Round(amountFiat) >= 1e6 {
-			amountFiatString = fmt.Sprintf("(%.2f M USDT)", amountFiat/float64(1e6))
-		}
-	}
-	addrFrom, alertEmojiFrom := formatAddress(&namedWalletFrom, msg.from, msg.amount, false)
-	addrTo, alertEmojiTo := formatAddress(&namedWalletTo, msg.to, msg.amount, true)
+	addrFrom, alertEmojiFrom := formatAddress(&namedWalletFrom, msg.from, msg.amountChain, false)
+	addrTo, alertEmojiTo := formatAddress(&namedWalletTo, msg.to, msg.amountChain, true)
 
 	var alertEmoji string
 	if alertEmojiFrom != "" {
@@ -277,22 +268,10 @@ func formatCexMessage(msg MessageCex) string {
 		sideActionEmoji = "🔴"
 	}
 
-	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %s \nTotal: %s (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, humanizeAmount(msg.Amount, "ALPH"), humanizeAmount(msg.AmountFiat, "USDT"), msg.Price)
+	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %s \nTotal: %s (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, msg.AmountLeft.formatHuman(), msg.AmountFiat.formatHuman(), msg.Price)
 
 	fmt.Println(text)
 	return text
-
-}
-
-func humanizeAmount(amount float64, symbol string) string {
-	amountStr := fmt.Sprintf("%.2f %s", amount, symbol)
-	if amount >= 1000.0 {
-		amountStr = fmt.Sprintf("%.2f K %s", amount/1000.0, symbol)
-	} else if amount >= 1e6 {
-		amountStr = fmt.Sprintf("%.2f M %s", amount/float64(1e6), symbol)
-	}
-
-	return amountStr
 
 }
 
@@ -396,4 +375,21 @@ func loadTokensToTrack() {
 
 		trackTokens[tokenId] = amountTrigger
 	}
+}
+
+func testsAlert(chTxs chan string) {
+
+	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
+	//KnownWallets = append(KnownWallets, testWallet...)
+
+	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+
+	// ayin test
+	chTxs <- "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"
+
+	// usdt test
+	chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
+
+	//wbtc test
+	chTxs <- "90cff504fe44e175817d26f95b48732745a9559ad37659c277780f1941ed2540"
 }

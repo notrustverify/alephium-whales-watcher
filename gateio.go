@@ -40,7 +40,7 @@ func getTradesGate(from int64, to int64, chMessagesCex chan MessageCex) {
 		}
 
 		if amountToFloat >= parameters.MinAmountTrigger {
-			chMessagesCex <- MessageCex{v.Side, amountToFloat, amountToFloat * priceToFloat, "Gateio", priceToFloat}
+			chMessagesCex <- MessageCex{v.Side, Amount{amountToFloat, "ALPH"}, Amount{amountToFloat * priceToFloat, "USDT"}, "Gateio", priceToFloat}
 		}
 	}
 

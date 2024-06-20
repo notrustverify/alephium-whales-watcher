@@ -15,8 +15,6 @@ import (
 	openapiclient "github.com/alephium/go-sdk"
 )
 
-const maxRetry = 3600
-
 type Transaction struct {
 	Type      string `json:"type"`
 	Hash      string `json:"hash"`
@@ -66,8 +64,12 @@ type TokenList struct {
 }
 
 const maxRetryFullnode = 10
+const maxRetry = 3600
 
+// find transactions in each blocks
 func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context, fromTs int64, toTs int64, ch chan string) {
+
+	// limit number of retry when calling fullnode API
 	cntRetry := 0
 	var blocks *openapiclient.BlocksPerTimeStampRange
 
@@ -92,8 +94,7 @@ func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context,
 
 	wg := sync.WaitGroup{}
 
-	for group := 0; group < len(blocks.Blocks); group++ {
-		block := blocks.Blocks[group]
+	for _, block := range blocks.Blocks {
 		wg.Add(1)
 		go getTxId(&block, &wg, ch)
 
@@ -108,6 +109,8 @@ func getTxId(block *[]openapiclient.BlockEntry, wg *sync.WaitGroup, chTxs chan s
 
 	for _, txs := range *block {
 		for _, tx := range txs.Transactions {
+
+			// no input mean coinbase tx
 			if len(tx.Unsigned.Inputs) > 0 {
 				txId := tx.Unsigned.TxId
 
@@ -173,16 +176,16 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 	addressIn := txData.Inputs[0].Address
 
 	var addressOut string
-	for outputIndex := 0; outputIndex < len(txData.Outputs); outputIndex++ {
-		addressOut = txData.Outputs[outputIndex].Address
-		txType := txData.Outputs[outputIndex].Type
+	for _, output := range txData.Outputs {
+		addressOut = output.Address
+		txType := output.Type
 
 		if strings.ToLower(txType) == "contractoutput" {
 			return
 		}
 
 		if strings.ToLower(txType) == "assetoutput" {
-			attoStrToFloat, err := strconv.ParseFloat(txData.Outputs[outputIndex].AttoAlphAmount, 32)
+			attoStrToFloat, err := strconv.ParseFloat(output.AttoAlphAmount, 32)
 			hintAmountALPH := attoStrToFloat / baseAlph
 
 			if hintAmountALPH >= parameters.MinAmountTrigger {
@@ -192,13 +195,12 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "Error when calling BlockflowApi.GetBlockflowBlocks: %v\n", err)
 					}
-					//log.Printf("From %s to %s -> %+v\n", addressIn, addressOut, attoStrToFloat/BASE_ALPH)
 					chMessages <- Message{addressIn, addressOut, hintAmountALPH, txId, Token{}}
 				}
 			}
 
-			if len(txData.Outputs[outputIndex].Tokens) > 0 {
-				for _, token := range txData.Outputs[outputIndex].Tokens {
+			if len(output.Tokens) > 0 {
+				for _, token := range output.Tokens {
 
 					if amountTrigger, found := trackTokens[token.ID]; found {
 						tokenData := searchTokenData(token.ID)

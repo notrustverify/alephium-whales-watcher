@@ -14,17 +14,17 @@ import (
 )
 
 type Message struct {
-	from      string
-	to        string
-	amount    float64
-	txId      string
-	tokenData Token
+	from        string
+	to          string
+	amountChain float64
+	txId        string
+	tokenData   Token
 }
 
 type MessageCex struct {
 	Side         string
-	Amount       float64
-	AmountFiat   float64
+	AmountLeft   Amount
+	AmountFiat   Amount
 	ExchangeName string
 	Price        float64
 }
@@ -38,10 +38,7 @@ type Parameters struct {
 	FullnodeApi              string
 	FrontendExplorerUrl      string
 	MinAmountTrigger         float64
-	MinAmountAyinTrigger     float64
-	MinAmountUsdtTrigger     float64
-	MinAmountEthTrigger      float64
-	MinAmountBtcTrigger      float64
+	debugMode                bool
 	PollingIntervalSec       int64
 	KnownWalletUrl           string
 	PriceUrl                 string
@@ -60,7 +57,6 @@ func main() {
 	loadEnv()
 	loadTokensToTrack()
 
-	getRndArticles()
 	updateTokens()
 	updateKnownWallet()
 
@@ -86,14 +82,6 @@ func main() {
 	chMessagesCex := make(chan MessageCex, 100)
 	chTxs := make(chan string, 100)
 
-	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
-	//KnownWallets = append(KnownWallets, testWallet...)
-
-	//ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	//telegramBot := initTelegram()
-	//defer cancel()
-	//telegramBot.Start(ctx)
-
 	telegramBot = initTelegram()
 	var err error
 	twitterBot, err = initTwitter()
@@ -102,22 +90,13 @@ func main() {
 		twitterBot = nil
 	}
 
-	//log.Printf("%+v\n", knownWallets)
-
-	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
-
-	// ayin test
-	chTxs <- "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"
-
-	// usdt test
-	//chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
-	//wbtc test
-	//chTxs <- "90cff504fe44e175817d26f95b48732745a9559ad37659c277780f1941ed2540"
-
-	//getTxData(apiClient, &ctxAlephium, "d317add70567414626b6d7e5fd26e841cf5d81de6e2adb8e1a6d6968f47848ba")
 	for w := 1; w <= 10; w++ {
 		go checkTx(chTxs, chMessages, w)
 		go messageConsumer(chMessagesCex, chMessages)
+	}
+
+	if parameters.debugMode {
+		testsAlert(chTxs)
 	}
 
 	go getCexTrades(chMessagesCex)
@@ -139,8 +118,8 @@ func checkTx(ch chan string, msgCh chan Message, wId int) {
 
 func getChain(apiClient *openapiclient.APIClient, ctxAlephium context.Context, chTxs chan string) {
 	for {
-		t := time.Now().Unix()
-		getBlocksFullnode(apiClient, &ctxAlephium, t*1000-parameters.PollingIntervalSec*1000, t*1000, chTxs)
+		timeNow := time.Now().Unix()
+		getBlocksFullnode(apiClient, &ctxAlephium, timeNow*1000-parameters.PollingIntervalSec*1000, timeNow*1000, chTxs)
 
 		log.Println("Sleepy sleepy")
 		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)
