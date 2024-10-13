@@ -60,10 +60,6 @@ func main() {
 	updateTokens()
 	updateKnownWallet()
 
-	var addr = "17R6Ptkz9i1LhiKyMhnitUMkgFygGeeQUFZvRx6GgV8Fc"
-	getAddressName(&addr)
-	return
-
 	cronScheduler := gocron.NewScheduler(time.UTC)
 
 	configuration := openapiclient.NewConfiguration()
