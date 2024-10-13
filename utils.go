@@ -180,13 +180,13 @@ func messageFormat(msg Message, isTelegram bool) string {
 	symbol := msg.tokenData.Symbol
 	if msg.tokenData.Name == "" {
 		symbol = "ALPH"
+		amountFiat := Amount{Value: amountChain * coinGeckoPrice, Symbol: "USDT"}
+		amountFiatString = "(" + amountFiat.formatHuman() + ")"
 	}
 
 	if symbol != "ALPH" {
 		decimal := float64(msg.tokenData.Decimals)
 		amountChain = msg.amountChain / math.Pow(10.0, decimal)
-		amountFiat := Amount{Value: amountChain * coinGeckoPrice, Symbol: "ALPH"}
-		amountFiatString = amountFiat.formatHuman()
 	}
 
 	humanFormatAmount := Amount{Value: amountChain, Symbol: symbol}.formatHuman()
@@ -205,13 +205,13 @@ func messageFormat(msg Message, isTelegram bool) string {
 
 	var text string
 	if isTelegram {
-		text = fmt.Sprintf("%s %s $%s transferred\n%s to %s %s\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", alertEmoji, humanFormatAmount, symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+		text = fmt.Sprintf("%s %s transferred\n%s to %s %s\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", alertEmoji, humanFormatAmount, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
 
 		rndArticle := getRndArticles()
 		text += fmt.Sprintf("Featured article: <a href='%s'>%s</a>", rndArticle.Url, rndArticle.Title)
 
 	} else {
-		text = fmt.Sprintf("%s %s %s transferred\n%s to %s %s\n\n%s/#/transactions/%s\n", alertEmoji, humanFormatAmount, symbol, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+		text = fmt.Sprintf("%s %s transferred\n%s to %s %s\n\n%s/#/transactions/%s\n", alertEmoji, humanFormatAmount, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
 
 		rndArticle := getRndArticles()
 		text += fmt.Sprintf("Feat. article: %s", rndArticle.Url)
