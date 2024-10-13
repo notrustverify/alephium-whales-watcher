@@ -47,7 +47,7 @@ type Parameters struct {
 
 var telegramBot *telego.Bot
 var twitterBot *gotwi.Client
-var KnownWallets []KnownWallet
+var KnownWallets map[string]KnownWallet
 var Tokens TokenList
 
 var parameters Parameters
@@ -59,6 +59,10 @@ func main() {
 
 	updateTokens()
 	updateKnownWallet()
+
+	var addr = "17R6Ptkz9i1LhiKyMhnitUMkgFygGeeQUFZvRx6GgV8Fc"
+	getAddressName(&addr)
+	return
 
 	cronScheduler := gocron.NewScheduler(time.UTC)
 

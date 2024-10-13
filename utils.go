@@ -10,7 +10,6 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -277,10 +276,9 @@ func formatCexMessage(msg MessageCex) string {
 
 func getAddressName(address *string) KnownWallet {
 
-	idx := slices.IndexFunc(KnownWallets, func(c KnownWallet) bool { return c.Address == *address })
-
-	if idx >= 0 {
-		return KnownWallets[idx]
+	if knownAddress, ok := KnownWallets[*address]; ok {
+		fmt.Println(knownAddress)
+		return knownAddress
 	}
 
 	return KnownWallet{}
@@ -333,7 +331,6 @@ func updateKnownWallet() {
 	if err != nil {
 		log.Printf("Error getting know wallet\n%s\n", err)
 	}
-
 	json.Unmarshal(dataBytes, &KnownWallets)
 
 }
