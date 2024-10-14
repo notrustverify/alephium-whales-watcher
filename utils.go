@@ -56,9 +56,9 @@ func (a Amount) formatHuman() string {
 	case amount < 0:
 		return fmt.Sprintf("%.3f %s", amount, a.Symbol)
 	case math.Round(amount) >= 1000.0:
-		return fmt.Sprintf("%.2f K %s", amount/1000.0, a.Symbol)
+		return fmt.Sprintf("%.2fK %s", amount/1000.0, a.Symbol)
 	case math.Round(amount) >= 1e6:
-		return fmt.Sprintf("%.2f M %s", amount/float64(1e6), a.Symbol)
+		return fmt.Sprintf("%.2fM %s", amount/float64(1e6), a.Symbol)
 	default:
 		return fmt.Sprintf("%.2f %s", amount, a.Symbol)
 	}
@@ -189,7 +189,7 @@ func messageFormat(msg Message, isTelegram bool) string {
 		amountChain = msg.amountChain / math.Pow(10.0, decimal)
 	}
 
-	humanFormatAmount := Amount{Value: amountChain, Symbol: symbol}.formatHuman()
+	humanFormatAmount := Amount{Value: amountChain, Symbol: "$" + symbol}.formatHuman()
 
 	addrFrom, alertEmojiFrom := formatAddress(&namedWalletFrom, msg.from, msg.amountChain, false)
 	addrTo, alertEmojiTo := formatAddress(&namedWalletTo, msg.to, msg.amountChain, true)
