@@ -205,7 +205,10 @@ func messageFormat(msg Message, isTelegram bool) string {
 
 	var text string
 	if isTelegram {
-		text = fmt.Sprintf("%s %s transferred\n%s to %s %s\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", alertEmoji, humanFormatAmount, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
+
+		groupsString := fmt.Sprintf("(%d -> %d)", msg.groupFrom, msg.groupTo)
+
+		text = fmt.Sprintf("%s %s transferred %s\n%s to %s %s\n\n<a href='%s/#/transactions/%s'>TX link</a>\n", alertEmoji, humanFormatAmount, groupsString, addrFrom, addrTo, amountFiatString, parameters.FrontendExplorerUrl, msg.txId)
 
 		rndArticle := getRndArticles()
 		text += fmt.Sprintf("Featured article: <a href='%s'>%s</a>", rndArticle.Url, rndArticle.Title)
@@ -374,19 +377,25 @@ func loadTokensToTrack() {
 	}
 }
 
-func testsAlert(chTxs chan string) {
+func testsAlert(chTxs chan Tx) {
 
 	//testWallet := []KnownWallet{{Address: "1iAFqJZm6PMTUDquiV7MtDse6oHBxRcdsq2N3qzsSZ9Q", Name: "test"}}
 	//KnownWallets = append(KnownWallets, testWallet...)
 
-	chTxs <- "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"
+	chTxs <- Tx{id: "c4c7f56e6b4ddebd2d81e93031f7fb82680885599fc87ce3ea7d2938b55b6c54"}
 
 	// ayin test
-	chTxs <- "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"
+	chTxs <- Tx{id: "895716a20912805c2029c61b1d78e2e2eeb78c49e9b26f4207257214c59ef408"}
 
 	// usdt test
-	chTxs <- "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"
+	chTxs <- Tx{id: "19ad56db69577087013ecbdaf6ebbd0a3246e7a539c3b32243c85ab09d0e1fd5"}
 
 	//wbtc test
-	chTxs <- "90cff504fe44e175817d26f95b48732745a9559ad37659c277780f1941ed2540"
+	chTxs <- Tx{id: "90cff504fe44e175817d26f95b48732745a9559ad37659c277780f1941ed2540"}
+
+	//apad test
+	chTxs <- Tx{id: "9e5a59317a2966911bc2dd62a985d0c4f497617df408c64d2e5ab273c28a0988"}
+
+	//multiple transfer test
+	chTxs <- Tx{id: "2720df2fc2d83b1b9f7891f9fa852e96806d93132a6fdfe76a6791b7a88d0425"}
 }

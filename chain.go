@@ -1,18 +1,20 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math"
+	"net/url"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	openapiclient "github.com/alephium/go-sdk"
+	"github.com/gorilla/websocket"
 )
 
 type Transaction struct {
@@ -49,6 +51,12 @@ type Transaction struct {
 	Coinbase          bool   `json:"coinbase"`
 }
 
+type Method string
+
+const (
+	block_notify Method = "block_notify"
+)
+
 type Token struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -63,44 +71,121 @@ type TokenList struct {
 	Tokens    []Token `json:"tokens"`
 }
 
-const maxRetryFullnode = 10
+type Ws struct {
+	Method Method `json:"method"`
+	Params struct {
+		Hash         string   `json:"hash"`
+		Timestamp    int64    `json:"timestamp"`
+		ChainFrom    int      `json:"chainFrom"`
+		ChainTo      int      `json:"chainTo"`
+		Height       int      `json:"height"`
+		Deps         []string `json:"deps"`
+		Transactions []struct {
+			Unsigned struct {
+				TxID         string `json:"txId"`
+				Version      int    `json:"version"`
+				NetworkID    int    `json:"networkId"`
+				GasAmount    int    `json:"gasAmount"`
+				GasPrice     string `json:"gasPrice"`
+				Inputs       []any  `json:"inputs"`
+				FixedOutputs []struct {
+					Hint           int    `json:"hint"`
+					Key            string `json:"key"`
+					AttoAlphAmount string `json:"attoAlphAmount"`
+					Address        string `json:"address"`
+					Tokens         []any  `json:"tokens"`
+					LockTime       int64  `json:"lockTime"`
+					Message        string `json:"message"`
+				} `json:"fixedOutputs"`
+			} `json:"unsigned"`
+			ScriptExecutionOk bool  `json:"scriptExecutionOk"`
+			ContractInputs    []any `json:"contractInputs"`
+			GeneratedOutputs  []any `json:"generatedOutputs"`
+			InputSignatures   []any `json:"inputSignatures"`
+			ScriptSignatures  []any `json:"scriptSignatures"`
+		} `json:"transactions"`
+		Nonce        string `json:"nonce"`
+		Version      int    `json:"version"`
+		DepStateHash string `json:"depStateHash"`
+		TxsHash      string `json:"txsHash"`
+		Target       string `json:"target"`
+		GhostUncles  []any  `json:"ghostUncles"`
+	} `json:"params"`
+	Jsonrpc string `json:"jsonrpc"`
+}
+
 const maxRetry = 3600
 
-// find transactions in each blocks
-func getBlocksFullnode(apiClient *openapiclient.APIClient, ctx *context.Context, fromTs int64, toTs int64, ch chan string) {
+var done chan interface{}
+var interrupt chan os.Signal
 
-	// limit number of retry when calling fullnode API
-	cntRetry := 0
-	var blocks *openapiclient.BlocksPerTimeStampRange
+// find transactions in each blocks
+func getBlocksFullnode(ch chan Tx) {
+
+	//interrupt := make(chan os.Signal, 1)
+	//signal.Notify(interrupt, os.Interrupt)
+
+	u := url.URL{Scheme: "wss", Host: "ws.fullnode2.alephium.notrustverify.ch", Path: "/events"}
+	done = make(chan interface{})    // Channel to indicate that the receiverHandler is done
+	interrupt = make(chan os.Signal) // Channel to listen for interrupt signal to terminate gracefully
+
+	signal.Notify(interrupt, os.Interrupt) // Notify the interrupt channel for SIGINT
+
+	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	if err != nil {
+		log.Fatal("Error connecting to Websocket Server:", err)
+	}
+	defer conn.Close()
+	go receiveHandler(conn, ch)
 
 	for {
-		blocksFullnode, r, err := apiClient.BlockflowApi.GetBlockflowBlocks(*ctx).FromTs(fromTs).ToTs(toTs).Execute()
+		select {
+		case <-time.After(time.Duration(10) * time.Millisecond * 1000):
+			// Send an echo packet every 10 second
+			err := conn.WriteMessage(websocket.TextMessage, []byte("ping"))
+			if err != nil {
+				log.Println("Error during writing to websocket:", err)
+				return
+			}
+
+		case <-interrupt:
+			// We received a SIGINT (Ctrl + C). Terminate gracefully...
+			log.Println("Received SIGINT interrupt signal. Closing all pending connections")
+
+			// Close our websocket connection
+			err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+			if err != nil {
+				log.Println("Error during closing websocket:", err)
+				return
+			}
+
+			select {
+			case <-done:
+				log.Println("Receiver Channel Closed! Exiting....")
+			case <-time.After(time.Duration(1) * time.Second):
+				log.Println("Timeout in closing receiving channel. Exiting....")
+			}
+			return
+		}
+	}
+
+}
+
+func receiveHandler(connection *websocket.Conn, ch chan Tx) {
+	defer close(done)
+	for {
+		_, msg, err := connection.ReadMessage()
 		if err != nil {
-			cntRetry++
+			log.Println("Error in receive:", err)
+			return
 		}
-
-		if err == nil {
-			blocks = blocksFullnode
-			break
-		}
-
-		if cntRetry >= maxRetryFullnode {
-			fmt.Fprintf(os.Stderr, "Error when calling `BlockflowApi.GetBlockflowBlocks``: %v\n", err)
-			fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
-			panic(err)
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	wg := sync.WaitGroup{}
-
-	for _, block := range blocks.Blocks {
-		wg.Add(1)
-		go getTxId(&block, &wg, ch)
+		//log.Printf("Received: %s\n", msg)
+		var data Ws
+		json.Unmarshal([]byte(msg), &data)
+		getTxIdWs(&data, ch)
+		//log.Printf("%+v", data)
 
 	}
-	wg.Wait()
-
 }
 
 func getTxId(block *[]openapiclient.BlockEntry, wg *sync.WaitGroup, chTxs chan string) {
@@ -120,6 +205,22 @@ func getTxId(block *[]openapiclient.BlockEntry, wg *sync.WaitGroup, chTxs chan s
 
 	}
 
+}
+
+func getTxIdWs(block *Ws, chTxs chan Tx) {
+
+	if block.Method == block_notify {
+		for _, tx := range block.Params.Transactions {
+			fmt.Println(tx.Unsigned.TxID)
+			// no input mean coinbase tx
+			if len(tx.Unsigned.Inputs) > 0 {
+				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo}
+
+				chTxs <- txId
+			}
+		}
+
+	}
 }
 
 func getTxStateExplorer(txId string, tx *Transaction) bool {
@@ -152,14 +253,14 @@ func getTxStateExplorer(txId string, tx *Transaction) bool {
 
 }
 
-func getTxData(txId string, chMessages chan Message, wId int) {
+func getTxData(txId Tx, chMessages chan Message, wId int) {
 	var txData Transaction
 	cntRetry := 0
-	log.Printf("worker %d check %s\n", wId, txId)
+	log.Printf("worker %d check %s\n", wId, txId.id)
 
 	for {
 
-		if getTxStateExplorer(txId, &txData) {
+		if getTxStateExplorer(txId.id, &txData) {
 			break
 		}
 
@@ -195,7 +296,7 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "Error when calling BlockflowApi.GetBlockflowBlocks: %v\n", err)
 					}
-					chMessages <- Message{addressIn, addressOut, hintAmountALPH, txId, Token{}}
+					chMessages <- Message{addressIn, addressOut, hintAmountALPH, txId.id, Token{}, txId.groupFrom, txId.groupTo}
 				}
 			}
 
@@ -219,7 +320,7 @@ func getTxData(txId string, chMessages chan Message, wId int) {
 
 						if amount >= float64(amountTrigger) {
 							if addressIn != addressOut {
-								chMessages <- Message{addressIn, addressOut, tokenAmount, txId, tokenData}
+								chMessages <- Message{addressIn, addressOut, tokenAmount, txId.id, tokenData, txId.groupFrom, txId.groupTo}
 							}
 						}
 					}

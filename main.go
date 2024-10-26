@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"log"
 	"math/rand"
 	"time"
 
-	openapiclient "github.com/alephium/go-sdk"
 	"github.com/go-co-op/gocron"
 	"github.com/michimani/gotwi"
 	"github.com/mymmrac/telego"
@@ -19,6 +17,14 @@ type Message struct {
 	amountChain float64
 	txId        string
 	tokenData   Token
+	groupFrom   int
+	groupTo     int
+}
+
+type Tx struct {
+	id        string
+	groupFrom int
+	groupTo   int
 }
 
 type MessageCex struct {
@@ -62,16 +68,6 @@ func main() {
 
 	cronScheduler := gocron.NewScheduler(time.UTC)
 
-	configuration := openapiclient.NewConfiguration()
-	apiClient := openapiclient.NewAPIClient(configuration)
-
-	ctxAlephium := context.WithValue(context.Background(), openapiclient.ContextServerVariables,
-		map[string]string{
-			"protocol": "https",
-			"host":     parameters.FullnodeApi,
-			"port":     "443",
-		})
-
 	cronScheduler.Every("5m").Do(updatePrice)
 	cronScheduler.Every("1h").Do(updateKnownWallet)
 	cronScheduler.Every("1h").Do(updateTokens)
@@ -80,7 +76,7 @@ func main() {
 
 	chMessages := make(chan Message, 100)
 	chMessagesCex := make(chan MessageCex, 100)
-	chTxs := make(chan string, 100)
+	chTxs := make(chan Tx, 100)
 
 	telegramBot = initTelegram()
 	var err error
@@ -99,11 +95,12 @@ func main() {
 		testsAlert(chTxs)
 	}
 
-	go getCexTrades(chMessagesCex)
-	getChain(apiClient, ctxAlephium, chTxs)
+	//go getCexTrades(chMessagesCex)
+	getBlocksFullnode(chTxs)
+
 }
 
-func checkTx(ch chan string, msgCh chan Message, wId int) {
+func checkTx(ch chan Tx, msgCh chan Message, wId int) {
 	for {
 
 		select {
@@ -113,16 +110,6 @@ func checkTx(ch chan string, msgCh chan Message, wId int) {
 		default:
 			time.Sleep(500 * time.Millisecond)
 		}
-	}
-}
-
-func getChain(apiClient *openapiclient.APIClient, ctxAlephium context.Context, chTxs chan string) {
-	for {
-		timeNow := time.Now().Unix()
-		getBlocksFullnode(apiClient, &ctxAlephium, timeNow*1000-parameters.PollingIntervalSec*1000, timeNow*1000, chTxs)
-
-		log.Println("Sleepy sleepy")
-		time.Sleep(time.Duration(parameters.PollingIntervalSec) * time.Second)
 	}
 }
 
