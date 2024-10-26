@@ -10,10 +10,8 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	openapiclient "github.com/alephium/go-sdk"
 	"github.com/gorilla/websocket"
 )
 
@@ -188,30 +186,11 @@ func receiveHandler(connection *websocket.Conn, ch chan Tx) {
 	}
 }
 
-func getTxId(block *[]openapiclient.BlockEntry, wg *sync.WaitGroup, chTxs chan string) {
-
-	defer wg.Done()
-
-	for _, txs := range *block {
-		for _, tx := range txs.Transactions {
-
-			// no input mean coinbase tx
-			if len(tx.Unsigned.Inputs) > 0 {
-				txId := tx.Unsigned.TxId
-
-				chTxs <- txId
-			}
-		}
-
-	}
-
-}
-
 func getTxIdWs(block *Ws, chTxs chan Tx) {
 
 	if block.Method == block_notify {
 		for _, tx := range block.Params.Transactions {
-			fmt.Println(tx.Unsigned.TxID)
+			//fmt.Println(tx.Unsigned.TxID)
 			// no input mean coinbase tx
 			if len(tx.Unsigned.Inputs) > 0 {
 				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo}

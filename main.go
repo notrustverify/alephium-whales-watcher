@@ -95,7 +95,7 @@ func main() {
 		testsAlert(chTxs)
 	}
 
-	//go getCexTrades(chMessagesCex)
+	go getCexTrades(chMessagesCex)
 	getBlocksFullnode(chTxs)
 
 }
