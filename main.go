@@ -42,6 +42,7 @@ type Parameters struct {
 	TwitterAccessTokenSecret string
 	ExplorerApi              string
 	FullnodeApi              string
+	WsFullnode               string
 	FrontendExplorerUrl      string
 	MinAmountTrigger         float64
 	debugMode                bool
@@ -95,7 +96,7 @@ func main() {
 		testsAlert(chTxs)
 	}
 
-	go getCexTrades(chMessagesCex)
+	//go getCexTrades(chMessagesCex)
 	getBlocksFullnode(chTxs)
 
 }

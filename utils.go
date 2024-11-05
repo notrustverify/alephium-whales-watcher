@@ -83,6 +83,8 @@ func loadEnv() {
 	parameters.TwitterAccessTokenSecret = os.Getenv("TWITTER_ACCESS_SECRET")
 
 	parameters.FullnodeApi = os.Getenv("FULLNODE_API_BASE")
+	parameters.WsFullnode = os.Getenv("FULLNODE_WS_BASE")
+
 	parameters.ExplorerApi = os.Getenv("API_EXPLORER_BASE")
 	parameters.FrontendExplorerUrl = os.Getenv("FRONTEND_EXPLORER")
 	parameters.KnownWalletUrl = os.Getenv("KNOWN_WALLETS_URL")

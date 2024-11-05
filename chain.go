@@ -123,7 +123,7 @@ func getBlocksFullnode(ch chan Tx) {
 	//interrupt := make(chan os.Signal, 1)
 	//signal.Notify(interrupt, os.Interrupt)
 
-	u := url.URL{Scheme: "wss", Host: "ws.fullnode2.alephium.notrustverify.ch", Path: "/events"}
+	u := url.URL{Scheme: "wss", Host: parameters.WsFullnode, Path: "/events"}
 	done = make(chan interface{})    // Channel to indicate that the receiverHandler is done
 	interrupt = make(chan os.Signal) // Channel to listen for interrupt signal to terminate gracefully
 
