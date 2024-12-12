@@ -35,6 +35,11 @@ type MessageCex struct {
 	Price        float64
 }
 
+type CexSymbol struct {
+	cex    string
+	symbol string
+}
+
 type Parameters struct {
 	TelegramChatId           int64
 	TelegramTokenApi         string
@@ -118,9 +123,10 @@ func checkTx(ch chan Tx, msgCh chan Message, wId int) {
 func getCexTrades(msgCh chan MessageCex) {
 	for {
 		t := time.Now().Unix()
+		mexcSymbols := []string{"ALPH", "ABX"}
 
 		go getTradesGate(t-parameters.PollingIntervalSec, t, msgCh)
-		go getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
+		go getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh, mexcSymbols)
 		go getTradesBitget(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh)
 
 		log.Println("CEX - Sleepy sleepy")

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
 )
@@ -17,10 +18,15 @@ type MexcAggTrades []struct {
 	TradeType    string      `json:"tradeType"`
 }
 
-func getTradesMexc(from int64, to int64, chMessagesCex chan MessageCex) {
+func getTradesMexc(from int64, to int64, chMessagesCex chan MessageCex, symbols []string) {
+	for _, symbol := range symbols {
+		getTrades(from, to, chMessagesCex, symbol)
+	}
+}
 
+func getTrades(from int64, to int64, chMessagesCex chan MessageCex, symbol string) {
 	var trades MexcAggTrades
-	dataBytes, _, err := getHttp("https://api.mexc.com/api/v3/trades/?symbol=ALPHUSDT")
+	dataBytes, _, err := getHttp(fmt.Sprintf("https://api.mexc.com/api/v3/trades/?symbol=%sUSDT", symbol))
 	if err != nil {
 		log.Printf("Error getting price\n%s\n", err)
 		return
@@ -52,8 +58,7 @@ func getTradesMexc(from int64, to int64, chMessagesCex chan MessageCex) {
 		}
 
 		if quoteQtyToFloat >= parameters.MinAmountCexTriggerUsd && v.Time >= from && v.Time <= to {
-			chMessagesCex <- MessageCex{side, Amount{amountToFloat, "ALPH"}, Amount{quoteQtyToFloat, "USDT"}, "Mexc", priceToFloat}
+			chMessagesCex <- MessageCex{side, Amount{amountToFloat, symbol}, Amount{quoteQtyToFloat, "USDT"}, "Mexc", priceToFloat}
 		}
 	}
-
 }

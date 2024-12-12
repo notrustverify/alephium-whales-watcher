@@ -57,7 +57,7 @@ func (a Amount) formatHuman() string {
 		return fmt.Sprintf("%.3f %s", amount, a.Symbol)
 	case math.Round(amount) >= 1000.0:
 		return fmt.Sprintf("%.2fK %s", amount/1000.0, a.Symbol)
-	case math.Round(amount) >= 1e6:
+	case math.Round(amount) >= float64(1e6):
 		return fmt.Sprintf("%.2fM %s", amount/float64(1e6), a.Symbol)
 	default:
 		return fmt.Sprintf("%.2f %s", amount, a.Symbol)
