@@ -44,14 +44,15 @@ func getTradesBitget(from int64, to int64, chMessagesCex chan MessageCex) {
 		if err != nil {
 			log.Printf("Cannot convert bitget price, err: %s\n", err)
 		}
+		fiatQty := amountToFloat * priceToFloat
 
 		tsToFloat, err := strconv.ParseInt(v.Ts, 10, 64)
 		if err != nil {
 			log.Printf("Cannot convert bitget price, err: %s\n", err)
 		}
 
-		if amountToFloat >= parameters.MinAmountTrigger && tsToFloat >= from && tsToFloat <= to {
-			chMessagesCex <- MessageCex{v.Side, Amount{amountToFloat, "ALPH"}, Amount{amountToFloat * priceToFloat, "USDT"}, "Bitget", priceToFloat}
+		if fiatQty >= parameters.MinAmountTrigger && tsToFloat >= from && tsToFloat <= to {
+			chMessagesCex <- MessageCex{v.Side, Amount{amountToFloat, "ALPH"}, Amount{fiatQty, "USDT"}, "Bitget", priceToFloat}
 		}
 	}
 

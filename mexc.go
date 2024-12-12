@@ -51,7 +51,7 @@ func getTradesMexc(from int64, to int64, chMessagesCex chan MessageCex) {
 			side = "sell"
 		}
 
-		if amountToFloat >= parameters.MinAmountTrigger && v.Time >= from && v.Time <= to {
+		if quoteQtyToFloat >= parameters.MinAmountCexTriggerUsd && v.Time >= from && v.Time <= to {
 			chMessagesCex <- MessageCex{side, Amount{amountToFloat, "ALPH"}, Amount{quoteQtyToFloat, "USDT"}, "Mexc", priceToFloat}
 		}
 	}

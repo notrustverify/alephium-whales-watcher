@@ -110,6 +110,14 @@ func loadEnv() {
 
 	parameters.MinAmountTrigger = minAmountTriggerFloat
 
+	MinAmountCexTriggerUsdFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_TRIGGER_CEX_USD"), 64)
+	if err != nil {
+		log.Printf("error getting min amount trigger cex from env, err: %s", err)
+		minAmountTriggerFloat = 5000
+	}
+
+	parameters.MinAmountCexTriggerUsd = MinAmountCexTriggerUsdFloat
+
 	pollingIntervalSecInt, err := strconv.ParseInt(os.Getenv("POLLING_INTERVAL_SEC"), 10, 64)
 	if err != nil {
 		log.Printf("error getting polling interval from env, err: %s\n", err)

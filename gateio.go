@@ -39,8 +39,10 @@ func getTradesGate(from int64, to int64, chMessagesCex chan MessageCex) {
 			log.Printf("Cannot convert gateio price, err: %s\n", err)
 		}
 
-		if amountToFloat >= parameters.MinAmountTrigger {
-			chMessagesCex <- MessageCex{v.Side, Amount{amountToFloat, "ALPH"}, Amount{amountToFloat * priceToFloat, "USDT"}, "Gateio", priceToFloat}
+		fiatQty := amountToFloat * priceToFloat
+
+		if fiatQty >= parameters.MinAmountCexTriggerUsd {
+			chMessagesCex <- MessageCex{v.Side, Amount{amountToFloat, "ALPH"}, Amount{fiatQty, "USDT"}, "Gateio", priceToFloat}
 		}
 	}
 

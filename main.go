@@ -45,6 +45,7 @@ type Parameters struct {
 	WsFullnode               string
 	FrontendExplorerUrl      string
 	MinAmountTrigger         float64
+	MinAmountCexTriggerUsd   float64
 	debugMode                bool
 	PollingIntervalSec       int64
 	KnownWalletUrl           string
