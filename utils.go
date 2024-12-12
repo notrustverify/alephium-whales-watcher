@@ -400,4 +400,7 @@ func testsAlert(chTxs chan Tx) {
 
 	//multiple transfer test
 	chTxs <- Tx{id: "2720df2fc2d83b1b9f7891f9fa852e96806d93132a6fdfe76a6791b7a88d0425"}
+
+	// abx mexc
+	chTxs <- Tx{id: "905bf9f6d6dbcf518c948f97c634203cbc9e9b1e57820a79bb876370dcbaab88"}
 }
