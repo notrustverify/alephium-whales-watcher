@@ -193,8 +193,8 @@ func messageFormat(msg Message, isTelegram bool) string {
 
 	humanFormatAmount := Amount{Value: amountChain, Symbol: "$" + symbol}.formatHuman()
 
-	addrFrom, alertEmojiFrom := formatAddress(&namedWalletFrom, msg.from, msg.amountChain, false)
-	addrTo, alertEmojiTo := formatAddress(&namedWalletTo, msg.to, msg.amountChain, true)
+	addrFrom, alertEmojiFrom := formatAddress(&namedWalletFrom, msg.from, amountChain, false)
+	addrTo, alertEmojiTo := formatAddress(&namedWalletTo, msg.to, amountChain, true)
 
 	var alertEmoji string
 	if alertEmojiFrom != "" {
