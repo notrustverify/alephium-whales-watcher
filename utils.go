@@ -313,7 +313,7 @@ func sendTelegramMessage(b *telego.Bot, chatId int64, message string) {
 func sendTwitterPost(c *gotwi.Client, text string) (string, error) {
 	p := &types.CreateInput{
 		Text:          gotwi.String(text),
-		ReplySettings: gotwi.String("following"),
+		ReplySettings: gotwi.String("everyone"),
 	}
 
 	res, err := managetweet.Create(context.Background(), c, p)
