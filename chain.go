@@ -204,7 +204,6 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 			// no input mean coinbase tx
 			if len(tx.Unsigned.Inputs) > 0 {
 				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo}
-				log.Printf("New tx %s\n", txId.id)
 
 				chTxs <- txId
 			}
