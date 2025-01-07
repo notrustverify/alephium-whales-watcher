@@ -189,11 +189,22 @@ func receiveHandler(connection *websocket.Conn, ch chan Tx) {
 func getTxIdWs(block *Ws, chTxs chan Tx) {
 
 	if block.Method == block_notify {
+
+		isGhost, err := isGhostUncle(block.Params.Hash)
+		if err != nil {
+			log.Printf("Error checking if block is ghost uncle: %v", err)
+		}
+
+		if isGhost {
+			log.Printf("Block %s is a ghost uncle.", block.Params.Hash)
+		}
+
 		for _, tx := range block.Params.Transactions {
 			//fmt.Println(tx.Unsigned.TxID)
 			// no input mean coinbase tx
 			if len(tx.Unsigned.Inputs) > 0 {
 				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo}
+				log.Printf("New tx %s\n", txId.id)
 
 				chTxs <- txId
 			}
@@ -202,10 +213,32 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 	}
 }
 
+func isGhostUncle(blockHash string) (bool, error) {
+	url := fmt.Sprintf("https://%s/blockflow/is-block-in-main-chain?blockHash=%s", parameters.FullnodeApi, blockHash)
+
+	dataBytes, statusCode, err := getHttp(url)
+	if err != nil {
+		return false, fmt.Errorf("failed to query block status: %w", err)
+	}
+
+	if statusCode != 200 {
+		return false, fmt.Errorf("unexpected status code: %d", statusCode)
+	}
+
+	var isMainChain bool
+	err = json.Unmarshal(dataBytes, &isMainChain)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Return inverse since we want to know if it's a ghost/uncle
+	return !isMainChain, nil
+}
+
 func getTxStateExplorer(txId string, tx *Transaction) bool {
 	dataBytes, statusCode, err := getHttp(fmt.Sprintf("%s/transactions/%s", parameters.ExplorerApi, txId))
 
-	if err != nil { // do not print error if 404
+	if err != nil && parameters.debugMode { // do not print error if 404
 		log.Printf("Error get data from explorer\n%s\n", err)
 		return false
 	}

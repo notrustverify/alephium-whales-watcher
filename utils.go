@@ -411,4 +411,5 @@ func testsAlert(chTxs chan Tx) {
 
 	// abx mexc
 	chTxs <- Tx{id: "905bf9f6d6dbcf518c948f97c634203cbc9e9b1e57820a79bb876370dcbaab88"}
+
 }
