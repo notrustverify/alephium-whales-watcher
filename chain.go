@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -118,6 +119,98 @@ type Ws struct {
 
 const maxRetry = 3600
 
+const (
+	maxWorkers  = 50
+	queueSize   = 1000
+	taskTimeout = 30 * time.Minute
+)
+
+type Task struct {
+	data    *Ws
+	ch      chan Tx
+	retries int
+}
+
+type QueueMetrics struct {
+	dropped   atomic.Int64
+	queued    atomic.Int64
+	processed atomic.Int64
+}
+
+type TaskQueue struct {
+	tasks    chan Task
+	workers  chan struct{}
+	shutdown chan struct{}
+	metrics  *QueueMetrics
+}
+
+func NewTaskQueue() *TaskQueue {
+	tq := &TaskQueue{
+		tasks:    make(chan Task, queueSize),
+		workers:  make(chan struct{}, maxWorkers),
+		shutdown: make(chan struct{}),
+		metrics:  &QueueMetrics{},
+	}
+
+	// Start monitoring
+	go tq.monitorQueue()
+
+	// Start workers
+	for i := 0; i < maxWorkers; i++ {
+		go tq.worker()
+	}
+
+	return tq
+}
+
+func (tq *TaskQueue) monitorQueue() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			log.Printf("Queue stats - Queued: %d, Processed: %d, Dropped: %d, Queue Size: %d/%d, Workers: %d/%d",
+				tq.metrics.queued.Load(),
+				tq.metrics.processed.Load(),
+				tq.metrics.dropped.Load(),
+				len(tq.tasks),
+				cap(tq.tasks),
+				len(tq.workers),
+				cap(tq.workers))
+		case <-tq.shutdown:
+			return
+		}
+	}
+}
+
+func (tq *TaskQueue) worker() {
+	for {
+		select {
+		case <-tq.shutdown:
+			return
+		case task := <-tq.tasks:
+			select {
+			case tq.workers <- struct{}{}:
+				getTxIdWs(task.data, task.ch)
+				<-tq.workers // Release worker
+				tq.metrics.processed.Add(1)
+			default:
+				// Worker pool full - retry task
+				time.Sleep(time.Duration(task.retries*100) * time.Millisecond)
+				task.retries++
+				// Put task back in queue
+				go func() {
+					tq.tasks <- task
+				}()
+				log.Printf("Retrying task, attempt %d", task.retries)
+			}
+		}
+	}
+}
+
+var taskQueue = NewTaskQueue()
+
 var done chan interface{}
 var interrupt chan os.Signal
 
@@ -181,18 +274,66 @@ func receiveHandler(connection *websocket.Conn, ch chan Tx) {
 			log.Println("Error in receive:", err)
 			return
 		}
-		//log.Printf("Received: %s\n", msg)
-		var data Ws
-		json.Unmarshal([]byte(msg), &data)
-		getTxIdWs(&data, ch)
-		//log.Printf("%+v", data)
 
+		var data Ws
+		if err := json.Unmarshal(msg, &data); err != nil {
+			log.Printf("Error unmarshaling message: %v", err)
+			continue
+		}
+
+		task := Task{
+			data:    &data,
+			ch:      ch,
+			retries: 0,
+		}
+
+		// Keep trying to queue task with exponential backoff
+		go func(t Task) {
+			backoff := time.Millisecond * 100
+			for {
+				select {
+				case taskQueue.tasks <- t:
+					taskQueue.metrics.queued.Add(1)
+					return
+				default:
+					time.Sleep(backoff)
+					backoff *= 2
+					if backoff > time.Second*10 {
+						backoff = time.Second * 10
+					}
+				}
+			}
+		}(task)
 	}
 }
 
 func getTxIdWs(block *Ws, chTxs chan Tx) {
-
 	if block.Method == block_notify {
+
+		for {
+			cntRetry := 0
+			if getHeightFullnodeState(block.Params.ChainFrom, block.Params.ChainTo, block.Params.Height) {
+				isGhost, err := isGhostUncle(block.Params.Hash)
+				//log.Printf("Block %s is ghost uncle: %v", block.Params.Hash, isGhost)
+				if err != nil {
+					log.Printf("Error checking if block is ghost uncle: %v", err)
+				}
+
+				if isGhost {
+					log.Printf("Block %s is a ghost uncle.", block.Params.Hash)
+					return
+				}
+
+				if cntRetry >= maxRetry {
+					return
+				}
+
+				cntRetry++
+
+				break
+			}
+			time.Sleep(10 * time.Second)
+		}
 
 		for _, tx := range block.Params.Transactions {
 
@@ -280,7 +421,8 @@ func getHeightFullnodeState(groupFrom int, groupTo int, txHeight int) bool {
 	}
 
 	//log.Printf("block %d,now Height %d\n", txHeight, heightResp.CurrentHeight)
-	return txHeight+10 >= heightResp.CurrentHeight
+	//log.Println(heightResp.CurrentHeight - txHeight)
+	return heightResp.CurrentHeight-txHeight >= 10
 }
 
 func getTxData(txId Tx, chMessages chan Message, wId int) {
@@ -292,19 +434,7 @@ func getTxData(txId Tx, chMessages chan Message, wId int) {
 
 		if getTxStateExplorer(txId.id, &txData) {
 
-			if getHeightFullnodeState(txId.groupFrom, txId.groupTo, txId.height) {
-				isGhost, err := isGhostUncle(txData.BlockHash)
-				log.Printf("For tx id %s, Block %s is ghost uncle: %v", txId.id, txData.BlockHash, isGhost)
-				if err != nil {
-					log.Printf("Error checking if block is ghost uncle: %v", err)
-				}
-
-				if isGhost {
-					log.Printf("Block %s is a ghost uncle.", txData.BlockHash)
-					return
-				}
-				break
-			}
+			break
 		}
 
 		if cntRetry >= maxRetry {

@@ -82,9 +82,9 @@ func main() {
 	cronScheduler.StartAsync()
 	rand.NewSource(time.Now().UnixNano())
 
-	chMessages := make(chan Message, 100)
+	chMessages := make(chan Message, 300)
 	chMessagesCex := make(chan MessageCex, 100)
-	chTxs := make(chan Tx, 100)
+	chTxs := make(chan Tx, 500)
 
 	telegramBot = initTelegram()
 	var err error
@@ -94,7 +94,7 @@ func main() {
 		twitterBot = nil
 	}
 
-	for w := 1; w <= 10; w++ {
+	for w := 1; w <= 30; w++ {
 		go checkTx(chTxs, chMessages, w)
 		go messageConsumer(chMessagesCex, chMessages)
 	}
