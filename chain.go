@@ -69,6 +69,10 @@ type TokenList struct {
 	Tokens    []Token `json:"tokens"`
 }
 
+type HeightResponse struct {
+	CurrentHeight int `json:"currentHeight"`
+}
+
 type Ws struct {
 	Method Method `json:"method"`
 	Params struct {
@@ -190,20 +194,11 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 
 	if block.Method == block_notify {
 
-		isGhost, err := isGhostUncle(block.Params.Hash)
-		if err != nil {
-			log.Printf("Error checking if block is ghost uncle: %v", err)
-		}
-
-		if isGhost {
-			log.Printf("Block %s is a ghost uncle.", block.Params.Hash)
-		}
-
 		for _, tx := range block.Params.Transactions {
-			//fmt.Println(tx.Unsigned.TxID)
+
 			// no input mean coinbase tx
 			if len(tx.Unsigned.Inputs) > 0 {
-				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo}
+				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo, height: block.Params.Height}
 
 				chTxs <- txId
 			}
@@ -238,7 +233,7 @@ func getTxStateExplorer(txId string, tx *Transaction) bool {
 	dataBytes, statusCode, err := getHttp(fmt.Sprintf("%s/transactions/%s", parameters.ExplorerApi, txId))
 
 	if err != nil && parameters.debugMode { // do not print error if 404
-		log.Printf("Error get data from explorer\n%s\n", err)
+		//log.Printf("Error get data from explorer\n%s\n", err)
 		return false
 	}
 
@@ -264,6 +259,30 @@ func getTxStateExplorer(txId string, tx *Transaction) bool {
 
 }
 
+func getHeightFullnodeState(groupFrom int, groupTo int, txHeight int) bool {
+	url := fmt.Sprintf("https://%s/blockflow/chain-info?fromGroup=%d&toGroup=%d", parameters.FullnodeApi, groupFrom, groupTo)
+	dataBytes, statusCode, err := getHttp(url)
+	if err != nil {
+		log.Printf("Error getting height\n%s\n", err)
+		return false
+	}
+
+	if statusCode != 200 {
+		log.Printf("Error getting height\n%s\n", err)
+		return false
+	}
+
+	var heightResp HeightResponse
+	err = json.Unmarshal(dataBytes, &heightResp)
+	if err != nil {
+		log.Printf("Error getting height\n%s\n", err)
+		return false
+	}
+
+	//log.Printf("block %d,now Height %d\n", txHeight, heightResp.CurrentHeight)
+	return txHeight+10 >= heightResp.CurrentHeight
+}
+
 func getTxData(txId Tx, chMessages chan Message, wId int) {
 	var txData Transaction
 	cntRetry := 0
@@ -272,7 +291,20 @@ func getTxData(txId Tx, chMessages chan Message, wId int) {
 	for {
 
 		if getTxStateExplorer(txId.id, &txData) {
-			break
+
+			if getHeightFullnodeState(txId.groupFrom, txId.groupTo, txId.height) {
+				isGhost, err := isGhostUncle(txData.BlockHash)
+				log.Printf("For tx id %s, Block %s is ghost uncle: %v", txId.id, txData.BlockHash, isGhost)
+				if err != nil {
+					log.Printf("Error checking if block is ghost uncle: %v", err)
+				}
+
+				if isGhost {
+					log.Printf("Block %s is a ghost uncle.", txData.BlockHash)
+					return
+				}
+				break
+			}
 		}
 
 		if cntRetry >= maxRetry {
@@ -280,7 +312,7 @@ func getTxData(txId Tx, chMessages chan Message, wId int) {
 		}
 
 		cntRetry++
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Second)
 
 	}
 

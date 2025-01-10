@@ -23,6 +23,7 @@ type Message struct {
 
 type Tx struct {
 	id        string
+	height    int
 	groupFrom int
 	groupTo   int
 }
