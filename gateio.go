@@ -43,6 +43,7 @@ func getTradesGate(from int64, to int64, chMessagesCex chan MessageCex) {
 
 		if fiatQty >= parameters.MinAmountCexTriggerUsd {
 			chMessagesCex <- MessageCex{v.Side, Amount{amountToFloat, "ALPH"}, Amount{fiatQty, "USDT"}, "Gateio", priceToFloat}
+			cexQueueMetrics.Inc()
 		}
 	}
 

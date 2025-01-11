@@ -349,6 +349,7 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo, height: block.Params.Height}
 
 				chTxs <- txId
+				txQueueMetrics.Inc()
 			}
 		}
 
@@ -477,6 +478,7 @@ func getTxData(txId Tx, chMessages chan Message, wId int) {
 						fmt.Fprintf(os.Stderr, "Error when calling BlockflowApi.GetBlockflowBlocks: %v\n", err)
 					}
 					chMessages <- Message{addressIn, addressOut, hintAmountALPH, txId.id, Token{}, txId.groupFrom, txId.groupTo}
+					notificationQueueMetric.Inc()
 				}
 			}
 
@@ -501,6 +503,7 @@ func getTxData(txId Tx, chMessages chan Message, wId int) {
 						if amount >= float64(amountTrigger) {
 							if addressIn != addressOut {
 								chMessages <- Message{addressIn, addressOut, tokenAmount, txId.id, tokenData, txId.groupFrom, txId.groupTo}
+								notificationQueueMetric.Inc()
 							}
 						}
 					}
@@ -510,4 +513,5 @@ func getTxData(txId Tx, chMessages chan Message, wId int) {
 
 		}
 	}
+
 }

@@ -52,6 +52,55 @@ var (
 	})
 )
 
+var (
+	txQueueMetrics = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "whales_watcher_tx_queue",
+		Help: "Total number of transactions in queue",
+	})
+)
+
+var (
+	txQueueWorkersMetrics = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "whales_watcher_tx_queue_workers",
+		Help: "Total number of workers for tx queue",
+	})
+)
+
+var (
+	txQueueSizeMetrics = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "whales_watcher_tx_queue_size",
+		Help: "Size tx queue",
+	})
+)
+
+var (
+	cexQueueMetrics = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "whales_watcher_cex_queue",
+		Help: "Total number of cex messages in queue",
+	})
+)
+
+var (
+	notificationQueueMetric = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "whales_watcher_notification_queue",
+		Help: "Total number of message to send to telegram/twitter in queue",
+	})
+)
+
+var (
+	notificationQueueSizeMetric = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "whales_watcher_notification_queue_size",
+		Help: "Size queue to send to telegram/twitter",
+	})
+)
+
+var (
+	cexQueueSizeMetric = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "whales_watcher_cex_queue_size",
+		Help: "Size queue cex messages",
+	})
+)
+
 func metricsHttp() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(":2112", nil)

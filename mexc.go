@@ -59,6 +59,7 @@ func getTrades(from int64, to int64, chMessagesCex chan MessageCex, symbol strin
 
 		if quoteQtyToFloat >= parameters.MinAmountCexTriggerUsd && v.Time >= from && v.Time <= to {
 			chMessagesCex <- MessageCex{side, Amount{amountToFloat, symbol}, Amount{quoteQtyToFloat, "USDT"}, "Mexc", priceToFloat}
+			cexQueueMetrics.Inc()
 		}
 	}
 }

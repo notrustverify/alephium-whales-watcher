@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -83,9 +84,18 @@ func main() {
 	cronScheduler.StartAsync()
 	rand.NewSource(time.Now().UnixNano())
 
-	chMessages := make(chan Message, 300)
-	chMessagesCex := make(chan MessageCex, 100)
-	chTxs := make(chan Tx, 500)
+	maxWorkersTxs := 30
+	txQueueWorkersMetrics.Set(float64(maxWorkersTxs))
+	txQueueSize := 500
+	txQueueSizeMetrics.Set(float64(txQueueSize))
+	cexQueueSize := 100
+	cexQueueSizeMetric.Set(float64(cexQueueSize))
+	notificationQueueSize := 300
+	notificationQueueSizeMetric.Set(float64(notificationQueueSize))
+
+	chMessages := make(chan Message, notificationQueueSize)
+	chMessagesCex := make(chan MessageCex, cexQueueSize)
+	chTxs := make(chan Tx, txQueueSize)
 
 	telegramBot = initTelegram()
 	var err error
@@ -95,7 +105,7 @@ func main() {
 		twitterBot = nil
 	}
 
-	for w := 1; w <= 30; w++ {
+	for w := 1; w <= maxWorkersTxs; w++ {
 		go checkTx(chTxs, chMessages, w)
 		go messageConsumer(chMessagesCex, chMessages)
 	}
@@ -115,7 +125,8 @@ func checkTx(ch chan Tx, msgCh chan Message, wId int) {
 		select {
 		case tx := <-ch:
 			getTxData(tx, msgCh, wId)
-
+			fmt.Println(len(ch))
+			txQueueMetrics.Dec()
 		default:
 			time.Sleep(500 * time.Millisecond)
 		}
@@ -181,12 +192,14 @@ func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message) {
 				sendTwitterPost(twitterBot, formatCexMessage(msg))
 			}
 			//formatCexMessage(<-chMessagesCex)
+			cexQueueMetrics.Dec()
 		case msg := <-chMessages:
 			sendTelegramMessage(telegramBot, parameters.TelegramChatId, messageFormat(msg, true))
 
 			if twitterBot != nil {
 				sendTwitterPost(twitterBot, messageFormat(msg, false))
 			}
+			notificationQueueMetric.Dec()
 		//telegramMessageFormat(<-chMessages)
 		default:
 			time.Sleep(500 * time.Millisecond)
