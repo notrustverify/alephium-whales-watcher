@@ -74,6 +74,7 @@ func main() {
 	updateTokens()
 	updateKnownWallet()
 
+	go metricsHttp()
 	cronScheduler := gocron.NewScheduler(time.UTC)
 
 	cronScheduler.Every("5m").Do(updatePrice)

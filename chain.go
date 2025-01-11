@@ -159,6 +159,8 @@ func NewTaskQueue() *TaskQueue {
 	for i := 0; i < maxWorkers; i++ {
 		go tq.worker()
 	}
+	workersMetrics.Set(float64(maxWorkers))
+	queueSizeMetrics.Set(float64(queueSize))
 
 	return tq
 }
@@ -178,6 +180,8 @@ func (tq *TaskQueue) monitorQueue() {
 				cap(tq.tasks),
 				len(tq.workers),
 				cap(tq.workers))
+			queuedMetrics.Set(float64(tq.metrics.processed.Load()))
+			inqueueMetrics.Set(float64(len(tq.tasks)))
 		case <-tq.shutdown:
 			return
 		}
@@ -195,10 +199,12 @@ func (tq *TaskQueue) worker() {
 				getTxIdWs(task.data, task.ch)
 				<-tq.workers // Release worker
 				tq.metrics.processed.Add(1)
+				processedMetrics.Inc()
 			default:
 				// Worker pool full - retry task
 				time.Sleep(time.Duration(task.retries*100) * time.Millisecond)
 				task.retries++
+				retriedTasksMetrics.Inc()
 				// Put task back in queue
 				go func() {
 					tq.tasks <- task
@@ -294,6 +300,7 @@ func receiveHandler(connection *websocket.Conn, ch chan Tx) {
 				select {
 				case taskQueue.tasks <- t:
 					taskQueue.metrics.queued.Add(1)
+					queuedMetrics.Inc()
 					return
 				default:
 					time.Sleep(backoff)
