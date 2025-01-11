@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -86,10 +85,13 @@ func main() {
 
 	maxWorkersTxs := 30
 	txQueueWorkersMetrics.Set(float64(maxWorkersTxs))
+
 	txQueueSize := 500
 	txQueueSizeMetrics.Set(float64(txQueueSize))
+
 	cexQueueSize := 100
 	cexQueueSizeMetric.Set(float64(cexQueueSize))
+
 	notificationQueueSize := 300
 	notificationQueueSizeMetric.Set(float64(notificationQueueSize))
 
@@ -125,7 +127,6 @@ func checkTx(ch chan Tx, msgCh chan Message, wId int) {
 		select {
 		case tx := <-ch:
 			getTxData(tx, msgCh, wId)
-			fmt.Println(len(ch))
 			txQueueMetrics.Dec()
 		default:
 			time.Sleep(500 * time.Millisecond)

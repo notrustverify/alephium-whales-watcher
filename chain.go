@@ -348,8 +348,8 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 			if len(tx.Unsigned.Inputs) > 0 {
 				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo, height: block.Params.Height}
 
-				chTxs <- txId
 				txQueueMetrics.Inc()
+				chTxs <- txId
 			}
 		}
 
