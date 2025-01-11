@@ -86,7 +86,7 @@ func main() {
 	maxWorkersTxs := 30
 	txQueueWorkersMetrics.Set(float64(maxWorkersTxs))
 
-	txQueueSize := 500
+	txQueueSize := 300
 	txQueueSizeMetrics.Set(float64(txQueueSize))
 
 	cexQueueSize := 100
