@@ -83,7 +83,7 @@ func main() {
 	cronScheduler.StartAsync()
 	rand.NewSource(time.Now().UnixNano())
 
-	maxWorkersTxs := 30
+	maxWorkersTxs := 10
 	txQueueWorkersMetrics.Set(float64(maxWorkersTxs))
 
 	txQueueSize := 300
