@@ -55,7 +55,7 @@ func (a Amount) formatHuman() string {
 	switch {
 	case amount < 0:
 		return fmt.Sprintf("%.3f %s", amount, a.Symbol)
-	case math.Round(amount) >= 1000.0:
+	case math.Round(amount) >= 1000.0 && math.Round(amount) < 1e6:
 		return fmt.Sprintf("%.2fK %s", amount/1000.0, a.Symbol)
 	case math.Round(amount) >= float64(1e6):
 		return fmt.Sprintf("%.2fM %s", amount/float64(1e6), a.Symbol)
@@ -411,5 +411,8 @@ func testsAlert(chTxs chan Tx) {
 
 	// abx mexc
 	chTxs <- Tx{id: "905bf9f6d6dbcf518c948f97c634203cbc9e9b1e57820a79bb876370dcbaab88", height: math.MaxInt - 100}
+
+	// testing humamize millio
+	chTxs <- Tx{id: "904d3e2c2b49f70b86113e23ed46d973afeef8985ffa1e263fc90f868b65dc84", height: math.MaxInt - 100}
 
 }
