@@ -220,6 +220,13 @@ var taskQueue = NewTaskQueue()
 var done chan interface{}
 var interrupt chan os.Signal
 
+var ignoredAddressPairs = map[string]string{
+	"18KQPq3dJ9W4kXLWmtfMsRsptMRpkXe4HQCbRwXpw93jk": "12T7yHLpB1kaMBdHSApYM7H8aGXAET55axMiijJZYtK5G",
+	"12T7yHLpB1kaMBdHSApYM7H8aGXAET55axMiijJZYtK5G": "15AG4h7gy9EThb1riPwzzZh5v1yvPJwJ2ZaYieVJ4e1YE",
+	"1ANu47GYWwprmQJUgPpBsYb1mDoqxTDyVkCSg2C4NbtDp": "18KQPq3dJ9W4kXLWmtfMsRsptMRpkXe4HQCbRwXpw93jk",
+	"15AG4h7gy9EThb1riPwzzZh5v1yvPJwJ2ZaYieVJ4e1YE": "1ANu47GYWwprmQJUgPpBsYb1mDoqxTDyVkCSg2C4NbtDp",
+}
+
 // find transactions in each blocks
 func getBlocksFullnode(ch chan Tx) {
 
@@ -463,6 +470,11 @@ func getTxData(txId Tx, chMessages chan Message, wId int) {
 		txType := output.Type
 
 		if strings.ToLower(txType) == "contractoutput" {
+			return
+		}
+
+		// ignore transactions between these pairs of addresses
+		if expectedOut, exists := ignoredAddressPairs[addressIn]; exists && expectedOut == addressOut {
 			return
 		}
 

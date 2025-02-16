@@ -415,4 +415,7 @@ func testsAlert(chTxs chan Tx) {
 	// testing humamize millio
 	chTxs <- Tx{id: "904d3e2c2b49f70b86113e23ed46d973afeef8985ffa1e263fc90f868b65dc84", height: math.MaxInt - 100}
 
+	// testing tx between ignored address pairs
+	chTxs <- Tx{id: "7cb68e9f593be37c40e4b3d156c007d2d146c86eac922df961850426891d7f08", height: math.MaxInt - 100}
+
 }
