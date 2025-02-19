@@ -277,7 +277,7 @@ func formatCexMessage(msg MessageCex) string {
 
 	if strings.ToLower(msg.Side) == "sell" {
 		sideAction = "Sell"
-		sideActionEmoji = "🔴"
+		sideActionEmoji = ""
 	}
 
 	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %s \nTotal: %s (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, msg.AmountLeft.formatHuman(), msg.AmountFiat.formatHuman(), msg.Price)
