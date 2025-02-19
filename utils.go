@@ -258,7 +258,7 @@ func formatAddress(knownWallet *KnownWallet, address string, amount float64, to 
 	if knownWallet.ExchangeName != "" {
 		alertEmoji = strings.Repeat("🟢 ", len(strconv.Itoa(int(amount)))-1)
 		if to {
-			alertEmoji = strings.Repeat("🔴 ", len(strconv.Itoa(int(amount)))-1)
+			alertEmoji = ""
 		}
 	}
 
