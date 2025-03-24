@@ -121,7 +121,7 @@ const maxRetry = 3600
 
 const (
 	maxWorkers  = 50
-	queueSize   = 350
+	queueSize   = 500
 	taskTimeout = 30 * time.Minute
 )
 
