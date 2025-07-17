@@ -137,7 +137,7 @@ func checkTx(ch chan Tx, msgCh chan Message, wId int) {
 func getCexTrades(msgCh chan MessageCex) {
 	for {
 		t := time.Now().Unix()
-		mexcSymbols := []string{"ALPH", "ABX", "AYIN"}
+		mexcSymbols := []string{"ALPH", "ABX"}
 
 		go getTradesGate(t-parameters.PollingIntervalSec, t, msgCh)
 		go getTradesMexc(t*1000-parameters.PollingIntervalSec*1000, t*1000, msgCh, mexcSymbols)
