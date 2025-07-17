@@ -225,6 +225,8 @@ var ignoredAddressPairs = map[string]string{
 	"12T7yHLpB1kaMBdHSApYM7H8aGXAET55axMiijJZYtK5G": "15AG4h7gy9EThb1riPwzzZh5v1yvPJwJ2ZaYieVJ4e1YE",
 	"1ANu47GYWwprmQJUgPpBsYb1mDoqxTDyVkCSg2C4NbtDp": "18KQPq3dJ9W4kXLWmtfMsRsptMRpkXe4HQCbRwXpw93jk",
 	"15AG4h7gy9EThb1riPwzzZh5v1yvPJwJ2ZaYieVJ4e1YE": "1ANu47GYWwprmQJUgPpBsYb1mDoqxTDyVkCSg2C4NbtDp",
+	"1DEmoThKNJ8KTwsBU8snPTjF7e9AG7fUbh9uaNemGwREp": "17R6Ptkz9i1LhiKyMhnitUMkgFygGeeQUFZvRx6GgV8Fc",
+	"141Sf75o3SxyskgdHCsBmiW2AXqk5r2v3oqCC9bhbMdBd": "1DEmoThKNJ8KTwsBU8snPTjF7e9AG7fUbh9uaNemGwREp",
 }
 
 // find transactions in each blocks
