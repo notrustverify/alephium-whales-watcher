@@ -53,7 +53,7 @@ type Transaction struct {
 type Method string
 
 const (
-	block_notify Method = "block_notify"
+	subscriptionNotify Method = "subscription"
 )
 
 type Token struct {
@@ -77,44 +77,57 @@ type HeightResponse struct {
 type Ws struct {
 	Method Method `json:"method"`
 	Params struct {
-		Hash         string   `json:"hash"`
-		Timestamp    int64    `json:"timestamp"`
-		ChainFrom    int      `json:"chainFrom"`
-		ChainTo      int      `json:"chainTo"`
-		Height       int      `json:"height"`
-		Deps         []string `json:"deps"`
-		Transactions []struct {
-			Unsigned struct {
-				TxID         string `json:"txId"`
+		Subscription string `json:"subscription"`
+		Result       struct {
+			Block struct {
+				Hash         string   `json:"hash"`
+				Timestamp    int64    `json:"timestamp"`
+				ChainFrom    int      `json:"chainFrom"`
+				ChainTo      int      `json:"chainTo"`
+				Height       int      `json:"height"`
+				Deps         []string `json:"deps"`
+				Transactions []struct {
+					Unsigned struct {
+						TxID         string `json:"txId"`
+						Version      int    `json:"version"`
+						NetworkID    int    `json:"networkId"`
+						GasAmount    int    `json:"gasAmount"`
+						GasPrice     string `json:"gasPrice"`
+						Inputs       []any  `json:"inputs"`
+						FixedOutputs []struct {
+							Hint           int    `json:"hint"`
+							Key            string `json:"key"`
+							AttoAlphAmount string `json:"attoAlphAmount"`
+							Address        string `json:"address"`
+							Tokens         []any  `json:"tokens"`
+							LockTime       int64  `json:"lockTime"`
+							Message        string `json:"message"`
+						} `json:"fixedOutputs"`
+					} `json:"unsigned"`
+					ScriptExecutionOk bool  `json:"scriptExecutionOk"`
+					ContractInputs    []any `json:"contractInputs"`
+					GeneratedOutputs  []any `json:"generatedOutputs"`
+					InputSignatures   []any `json:"inputSignatures"`
+					ScriptSignatures  []any `json:"scriptSignatures"`
+				} `json:"transactions"`
+				Nonce        string `json:"nonce"`
 				Version      int    `json:"version"`
-				NetworkID    int    `json:"networkId"`
-				GasAmount    int    `json:"gasAmount"`
-				GasPrice     string `json:"gasPrice"`
-				Inputs       []any  `json:"inputs"`
-				FixedOutputs []struct {
-					Hint           int    `json:"hint"`
-					Key            string `json:"key"`
-					AttoAlphAmount string `json:"attoAlphAmount"`
-					Address        string `json:"address"`
-					Tokens         []any  `json:"tokens"`
-					LockTime       int64  `json:"lockTime"`
-					Message        string `json:"message"`
-				} `json:"fixedOutputs"`
-			} `json:"unsigned"`
-			ScriptExecutionOk bool  `json:"scriptExecutionOk"`
-			ContractInputs    []any `json:"contractInputs"`
-			GeneratedOutputs  []any `json:"generatedOutputs"`
-			InputSignatures   []any `json:"inputSignatures"`
-			ScriptSignatures  []any `json:"scriptSignatures"`
-		} `json:"transactions"`
-		Nonce        string `json:"nonce"`
-		Version      int    `json:"version"`
-		DepStateHash string `json:"depStateHash"`
-		TxsHash      string `json:"txsHash"`
-		Target       string `json:"target"`
-		GhostUncles  []any  `json:"ghostUncles"`
+				DepStateHash string `json:"depStateHash"`
+				TxsHash      string `json:"txsHash"`
+				Target       string `json:"target"`
+				GhostUncles  []any  `json:"ghostUncles"`
+			} `json:"block"`
+			Events []any `json:"events"`
+		} `json:"result"`
 	} `json:"params"`
 	Jsonrpc string `json:"jsonrpc"`
+}
+
+type WsSubscribeRequest struct {
+	Jsonrpc string   `json:"jsonrpc"`
+	ID      int      `json:"id"`
+	Method  string   `json:"method"`
+	Params  []string `json:"params"`
 }
 
 const maxRetry = 3600
@@ -246,39 +259,36 @@ func getBlocksFullnode(ch chan Tx) {
 		log.Fatal("Error connecting to Websocket Server:", err)
 	}
 	defer conn.Close()
-	go receiveHandler(conn, ch)
 
-	for {
-		select {
-		case <-time.After(time.Duration(10) * time.Millisecond * 1000):
-			// Send an echo packet every 10 second
-			err := conn.WriteMessage(websocket.TextMessage, []byte("ping"))
-			if err != nil {
-				log.Println("Error during writing to websocket:", err)
-				return
-			}
-
-		case <-interrupt:
-			// We received a SIGINT (Ctrl + C). Terminate gracefully...
-			log.Println("Received SIGINT interrupt signal. Closing all pending connections")
-
-			// Close our websocket connection
-			err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			if err != nil {
-				log.Println("Error during closing websocket:", err)
-				return
-			}
-
-			select {
-			case <-done:
-				log.Println("Receiver Channel Closed! Exiting....")
-			case <-time.After(time.Duration(1) * time.Second):
-				log.Println("Timeout in closing receiving channel. Exiting....")
-			}
-			return
-		}
+	subscribeReq := WsSubscribeRequest{
+		Jsonrpc: "2.0",
+		ID:      1,
+		Method:  "subscribe",
+		Params:  []string{"block"},
+	}
+	if err := conn.WriteJSON(subscribeReq); err != nil {
+		log.Fatal("Error subscribing to block notifications:", err)
 	}
 
+	go receiveHandler(conn, ch)
+
+	<-interrupt
+	// We received a SIGINT (Ctrl + C). Terminate gracefully...
+	log.Println("Received SIGINT interrupt signal. Closing all pending connections")
+
+	// Close our websocket connection
+	err = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	if err != nil {
+		log.Println("Error during closing websocket:", err)
+		return
+	}
+
+	select {
+	case <-done:
+		log.Println("Receiver Channel Closed! Exiting....")
+	case <-time.After(time.Duration(1) * time.Second):
+		log.Println("Timeout in closing receiving channel. Exiting....")
+	}
 }
 
 func receiveHandler(connection *websocket.Conn, ch chan Tx) {
@@ -324,19 +334,20 @@ func receiveHandler(connection *websocket.Conn, ch chan Tx) {
 }
 
 func getTxIdWs(block *Ws, chTxs chan Tx) {
-	if block.Method == block_notify {
+	if block.Method == subscriptionNotify {
+		blockData := block.Params.Result.Block
 
 		for {
 			cntRetry := 0
-			if getHeightFullnodeState(block.Params.ChainFrom, block.Params.ChainTo, block.Params.Height) {
-				isGhost, err := isGhostUncle(block.Params.Hash)
-				//log.Printf("Block %s is ghost uncle: %v", block.Params.Hash, isGhost)
+			if getHeightFullnodeState(blockData.ChainFrom, blockData.ChainTo, blockData.Height) {
+				isGhost, err := isGhostUncle(blockData.Hash)
+				//log.Printf("Block %s is ghost uncle: %v", blockData.Hash, isGhost)
 				if err != nil {
 					log.Printf("Error checking if block is ghost uncle: %v", err)
 				}
 
 				if isGhost {
-					log.Printf("Block %s is a ghost uncle.", block.Params.Hash)
+					log.Printf("Block %s is a ghost uncle.", blockData.Hash)
 					return
 				}
 
@@ -351,11 +362,11 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 			time.Sleep(10 * time.Second)
 		}
 
-		for _, tx := range block.Params.Transactions {
+		for _, tx := range blockData.Transactions {
 
 			// no input mean coinbase tx
 			if len(tx.Unsigned.Inputs) > 0 {
-				txId := Tx{id: tx.Unsigned.TxID, groupFrom: block.Params.ChainFrom, groupTo: block.Params.ChainTo, height: block.Params.Height}
+				txId := Tx{id: tx.Unsigned.TxID, groupFrom: blockData.ChainFrom, groupTo: blockData.ChainTo, height: blockData.Height}
 
 				txQueueMetrics.Inc()
 				chTxs <- txId
