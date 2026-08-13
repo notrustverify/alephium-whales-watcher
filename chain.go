@@ -230,8 +230,14 @@ func (tq *TaskQueue) worker() {
 
 var taskQueue = NewTaskQueue()
 
-var done chan interface{}
 var interrupt chan os.Signal
+
+const (
+	wsReadTimeout    = 60 * time.Second
+	wsPingInterval   = 20 * time.Second
+	wsInitialBackoff = 1 * time.Second
+	wsMaxBackoff     = 60 * time.Second
+)
 
 var ignoredAddressPairs = map[string]string{
 	"18KQPq3dJ9W4kXLWmtfMsRsptMRpkXe4HQCbRwXpw93jk": "12T7yHLpB1kaMBdHSApYM7H8aGXAET55axMiijJZYtK5G",
@@ -243,66 +249,134 @@ var ignoredAddressPairs = map[string]string{
 }
 
 // find transactions in each blocks
+// Runs a reconnect loop: any dial failure, subscribe failure, or read error/timeout
+// (including a silently-dead TCP connection with no incoming data) triggers a fresh
+// connection after a backoff, instead of leaving the process stuck forever with no logs.
 func getBlocksFullnode(ch chan Tx) {
 
-	//interrupt := make(chan os.Signal, 1)
-	//signal.Notify(interrupt, os.Interrupt)
-
 	u := url.URL{Scheme: "wss", Host: parameters.WsFullnode, Path: "/events"}
-	done = make(chan interface{})    // Channel to indicate that the receiverHandler is done
-	interrupt = make(chan os.Signal) // Channel to listen for interrupt signal to terminate gracefully
+	interrupt = make(chan os.Signal, 1) // Channel to listen for interrupt signal to terminate gracefully
 
 	signal.Notify(interrupt, os.Interrupt) // Notify the interrupt channel for SIGINT
 
-	conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
-	if err != nil {
-		log.Fatal("Error connecting to Websocket Server:", err)
+	backoff := wsInitialBackoff
+
+	for {
+		select {
+		case <-interrupt:
+			log.Println("Received SIGINT interrupt signal. Exiting websocket loop")
+			return
+		default:
+		}
+
+		log.Printf("Connecting to fullnode websocket %s\n", u.String())
+		conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+		if err != nil {
+			log.Printf("Error connecting to Websocket Server: %v. Retrying in %s\n", err, backoff)
+			if !sleepOrInterrupt(backoff) {
+				return
+			}
+			backoff = nextBackoff(backoff)
+			continue
+		}
+
+		subscribeReq := WsSubscribeRequest{
+			Jsonrpc: "2.0",
+			ID:      1,
+			Method:  "subscribe",
+			Params:  []string{"block"},
+		}
+		if err := conn.WriteJSON(subscribeReq); err != nil {
+			log.Printf("Error subscribing to block notifications: %v. Reconnecting in %s\n", err, backoff)
+			conn.Close()
+			if !sleepOrInterrupt(backoff) {
+				return
+			}
+			backoff = nextBackoff(backoff)
+			continue
+		}
+
+		log.Println("Connected and subscribed to block notifications")
+		backoff = wsInitialBackoff
+
+		pingDone := make(chan struct{})
+		go wsPingLoop(conn, pingDone)
+
+		// receiveHandler blocks until the connection errors out, times out
+		// (see wsReadTimeout / ping keepalive below), or is closed by us.
+		receiveHandler(conn, ch)
+
+		close(pingDone)
+		conn.Close()
+
+		select {
+		case <-interrupt:
+			log.Println("Received SIGINT interrupt signal. Exiting websocket loop")
+			return
+		default:
+			log.Printf("Websocket disconnected, reconnecting in %s\n", backoff)
+			if !sleepOrInterrupt(backoff) {
+				return
+			}
+			backoff = nextBackoff(backoff)
+		}
 	}
-	defer conn.Close()
+}
 
-	subscribeReq := WsSubscribeRequest{
-		Jsonrpc: "2.0",
-		ID:      1,
-		Method:  "subscribe",
-		Params:  []string{"block"},
+func nextBackoff(backoff time.Duration) time.Duration {
+	backoff *= 2
+	if backoff > wsMaxBackoff {
+		return wsMaxBackoff
 	}
-	if err := conn.WriteJSON(subscribeReq); err != nil {
-		log.Fatal("Error subscribing to block notifications:", err)
-	}
+	return backoff
+}
 
-	go receiveHandler(conn, ch)
-
-	<-interrupt
-	// We received a SIGINT (Ctrl + C). Terminate gracefully...
-	log.Println("Received SIGINT interrupt signal. Closing all pending connections")
-
-	// Close our websocket connection
-	err = conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-	if err != nil {
-		log.Println("Error during closing websocket:", err)
-		return
-	}
-
+// sleepOrInterrupt waits out the backoff, returning false early if a SIGINT arrives.
+func sleepOrInterrupt(d time.Duration) bool {
 	select {
-	case <-done:
-		log.Println("Receiver Channel Closed! Exiting....")
-	case <-time.After(time.Duration(1) * time.Second):
-		log.Println("Timeout in closing receiving channel. Exiting....")
+	case <-interrupt:
+		return false
+	case <-time.After(d):
+		return true
+	}
+}
+
+// wsPingLoop sends periodic ping frames so a silently-dead connection (no FIN/RST,
+// just a black hole) hits the read deadline in receiveHandler instead of hanging forever.
+func wsPingLoop(conn *websocket.Conn, done chan struct{}) {
+	ticker := time.NewTicker(wsPingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if err := conn.WriteControl(websocket.PingMessage, []byte{}, time.Now().Add(5*time.Second)); err != nil {
+				log.Printf("Error sending websocket ping: %v\n", err)
+				return
+			}
+		case <-done:
+			return
+		}
 	}
 }
 
 func receiveHandler(connection *websocket.Conn, ch chan Tx) {
-	defer close(done)
+	connection.SetPongHandler(func(string) error {
+		connection.SetReadDeadline(time.Now().Add(wsReadTimeout))
+		return nil
+	})
+	connection.SetReadDeadline(time.Now().Add(wsReadTimeout))
+
 	for {
 		_, msg, err := connection.ReadMessage()
 		if err != nil {
-			log.Println("Error in receive:", err)
+			log.Printf("Error reading from websocket (connection considered dead): %v\n", err)
 			return
 		}
+		connection.SetReadDeadline(time.Now().Add(wsReadTimeout))
 
 		var data Ws
 		if err := json.Unmarshal(msg, &data); err != nil {
-			log.Printf("Error unmarshaling message: %v", err)
+			log.Printf("Error unmarshaling message: %v, raw: %s\n", err, string(msg))
 			continue
 		}
 
@@ -337,13 +411,13 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 	if block.Method == subscriptionNotify {
 		blockData := block.Params.Result.Block
 
+		cntRetry := 0
 		for {
-			cntRetry := 0
 			if getHeightFullnodeState(blockData.ChainFrom, blockData.ChainTo, blockData.Height) {
 				isGhost, err := isGhostUncle(blockData.Hash)
 				//log.Printf("Block %s is ghost uncle: %v", blockData.Hash, isGhost)
 				if err != nil {
-					log.Printf("Error checking if block is ghost uncle: %v", err)
+					log.Printf("Error checking if block %s is ghost uncle: %v", blockData.Hash, err)
 				}
 
 				if isGhost {
@@ -351,14 +425,15 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 					return
 				}
 
-				if cntRetry >= maxRetry {
-					return
-				}
-
-				cntRetry++
-
 				break
 			}
+
+			if cntRetry >= maxRetry {
+				log.Printf("Giving up on block %s (height %d, group %d->%d) after %d retries waiting for confirmations\n", blockData.Hash, blockData.Height, blockData.ChainFrom, blockData.ChainTo, cntRetry)
+				return
+			}
+
+			cntRetry++
 			time.Sleep(10 * time.Second)
 		}
 
@@ -432,19 +507,19 @@ func getHeightFullnodeState(groupFrom int, groupTo int, txHeight int) bool {
 	url := fmt.Sprintf("https://%s/blockflow/chain-info?fromGroup=%d&toGroup=%d", parameters.FullnodeApi, groupFrom, groupTo)
 	dataBytes, statusCode, err := getHttp(url)
 	if err != nil {
-		log.Printf("Error getting height\n%s\n", err)
+		log.Printf("Error getting height for group %d->%d: %s\n", groupFrom, groupTo, err)
 		return false
 	}
 
 	if statusCode != 200 {
-		log.Printf("Error getting height\n%s\n", err)
+		log.Printf("Error getting height for group %d->%d: unexpected status code %d\n", groupFrom, groupTo, statusCode)
 		return false
 	}
 
 	var heightResp HeightResponse
 	err = json.Unmarshal(dataBytes, &heightResp)
 	if err != nil {
-		log.Printf("Error getting height\n%s\n", err)
+		log.Printf("Error unmarshaling height response for group %d->%d: %s, raw: %s\n", groupFrom, groupTo, err, string(dataBytes))
 		return false
 	}
 

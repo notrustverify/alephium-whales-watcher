@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/joho/godotenv"
@@ -130,11 +131,12 @@ func loadEnv() {
 func getHttp(url string) ([]byte, int, error) {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 3
+	retryClient.HTTPClient.Timeout = 30 * time.Second
 	retryClient.Logger = nil
 	resp, err := retryClient.Get(url)
 
 	if err != nil {
-		log.Fatalf("HTTP query error: %s, url: %s\n", err, url)
+		log.Printf("HTTP query error after %d retries: %s, url: %s\n", retryClient.RetryMax, err, url)
 		return []byte{}, 0, fmt.Errorf("HTTP query error: %s, url: %s\n", err, url)
 	}
 
