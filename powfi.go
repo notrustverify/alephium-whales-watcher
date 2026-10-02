@@ -119,8 +119,10 @@ func watchPowfiPool(address string, interval time.Duration, ch chan MessageCex) 
 				initialized = true
 				log.Printf("Powfi pool=%s watching from cursor=%d interval=%s", address, cursor, interval)
 			}
+			// Use one price snapshot per polling cycle for consistent valuation.
+			price := alphUSDPrice()
 			// Keep the cursor unchanged until non-USDT swaps can be valued.
-			if quoteToken.ID != powfiUSDT && alphUSDPrice() <= 0 {
+			if quoteToken.ID != powfiUSDT && price <= 0 {
 				return fmt.Errorf("ALPH/USD price unavailable; retaining event cursor")
 			}
 			// The API cursor counts event batches, not individual events.
@@ -139,7 +141,7 @@ func watchPowfiPool(address string, interval time.Duration, ch chan MessageCex) 
 					if event.ContractAddress != address || event.EventIndex != 3 {
 						continue
 					}
-					msg, err := decodePowfiSwap(event, alphIndex, quoteToken, alphUSDPrice())
+					msg, err := decodePowfiSwap(event, alphIndex, quoteToken, price)
 					if err != nil {
 						log.Printf("Powfi pool=%s tx=%s invalid swap: %v", address, event.TxID, err)
 						continue

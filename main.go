@@ -127,15 +127,9 @@ func main() {
 }
 
 func checkTx(ch chan Tx, msgCh chan Message, wId int) {
-	for {
-
-		select {
-		case tx := <-ch:
-			getTxData(tx, msgCh, wId)
-			txQueueMetrics.Dec()
-		default:
-			time.Sleep(500 * time.Millisecond)
-		}
+	for tx := range ch {
+		getTxData(tx, msgCh, wId)
+		txQueueMetrics.Dec()
 	}
 }
 
@@ -192,10 +186,11 @@ func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message) {
 
 		select {
 		case msg := <-chMessagesCex:
-			sendTelegramMessage(telegramBot, parameters.TelegramChatId, formatCexMessage(msg))
+			text := formatCexMessage(msg)
+			sendTelegramMessage(telegramBot, parameters.TelegramChatId, text)
 
 			if twitterBot != nil {
-				sendTwitterPost(twitterBot, formatCexMessage(msg))
+				sendTwitterPost(twitterBot, text)
 			}
 			//formatCexMessage(<-chMessagesCex)
 			cexQueueMetrics.Dec()
@@ -206,9 +201,7 @@ func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message) {
 				sendTwitterPost(twitterBot, messageFormat(msg, false))
 			}
 			notificationQueueMetric.Dec()
-		//telegramMessageFormat(<-chMessages)
-		default:
-			time.Sleep(500 * time.Millisecond)
+			//telegramMessageFormat(<-chMessages)
 		}
 
 	}

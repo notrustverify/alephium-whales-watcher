@@ -74,6 +74,17 @@ func (a Amount) formatHuman() string {
 }
 
 var trackTokens map[string]float64
+var metadataMu sync.RWMutex
+var tokensByID map[string]Token
+
+// A shared client reuses connections across polling cycles and workers.
+var httpRetryClient = func() *retryablehttp.Client {
+	client := retryablehttp.NewClient()
+	client.RetryMax = 3
+	client.HTTPClient.Timeout = 30 * time.Second
+	client.Logger = nil
+	return client
+}()
 
 func loadEnv() {
 	err := godotenv.Load(".env")
@@ -122,7 +133,7 @@ func loadEnv() {
 	MinAmountCexTriggerUsdFloat, err := strconv.ParseFloat(os.Getenv("MIN_AMOUNT_TRIGGER_CEX_USD"), 64)
 	if err != nil {
 		log.Printf("error getting min amount trigger cex from env, err: %s", err)
-		minAmountTriggerFloat = 5000
+		MinAmountCexTriggerUsdFloat = 5000
 	}
 
 	parameters.MinAmountCexTriggerUsd = MinAmountCexTriggerUsdFloat
@@ -138,29 +149,28 @@ func loadEnv() {
 	}
 
 	pollingIntervalSecInt, err := strconv.ParseInt(os.Getenv("POLLING_INTERVAL_SEC"), 10, 64)
-	if err != nil {
-		log.Printf("error getting polling interval from env, err: %s\n", err)
-		parameters.PollingIntervalSec = 120
+	if err != nil || pollingIntervalSecInt <= 0 {
+		log.Printf("invalid POLLING_INTERVAL_SEC %q (%v); using 120s", os.Getenv("POLLING_INTERVAL_SEC"), err)
+		pollingIntervalSecInt = 120
 	}
 	parameters.PollingIntervalSec = pollingIntervalSecInt
 
 }
 
 func getHttp(url string) ([]byte, int, error) {
-	retryClient := retryablehttp.NewClient()
-	retryClient.RetryMax = 3
-	retryClient.HTTPClient.Timeout = 30 * time.Second
-	retryClient.Logger = nil
-	resp, err := retryClient.Get(url)
+	resp, err := httpRetryClient.Get(url)
 
 	if err != nil {
-		log.Printf("HTTP query error after %d retries: %s, url: %s\n", retryClient.RetryMax, err, url)
+		log.Printf("HTTP query error after %d retries: %s, url: %s\n", httpRetryClient.RetryMax, err, url)
 		return []byte{}, 0, fmt.Errorf("HTTP query error: %s, url: %s\n", err, url)
 	}
 
 	defer resp.Body.Close()
 
-	bodyBytes, _ := io.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, fmt.Errorf("read response from %s: %w", url, err)
+	}
 	statusCode := resp.StatusCode
 
 	if statusCode != 200 {
@@ -322,6 +332,8 @@ func formatCexMessage(msg MessageCex) string {
 }
 
 func getAddressName(address *string) KnownWallet {
+	metadataMu.RLock()
+	defer metadataMu.RUnlock()
 
 	if knownAddress, ok := KnownWallets[*address]; ok {
 		fmt.Println(knownAddress)
@@ -381,32 +393,48 @@ func updatePrice() {
 }
 
 func updateKnownWallet() {
-	dataBytes, _, err := getHttp(parameters.KnownWalletUrl)
+	data, _, err := getHttp(parameters.KnownWalletUrl)
 	if err != nil {
-		log.Printf("Error getting know wallet\n%s\n", err)
+		log.Printf("Error refreshing known wallets: %v", err)
+		return
 	}
-	json.Unmarshal(dataBytes, &KnownWallets)
-
+	var wallets map[string]KnownWallet
+	if err := json.Unmarshal(data, &wallets); err != nil {
+		log.Printf("Error decoding known wallets: %v", err)
+		return
+	}
+	metadataMu.Lock()
+	KnownWallets = wallets
+	metadataMu.Unlock()
 }
 
 func updateTokens() {
-	dataBytes, _, err := getHttp(parameters.TokenListUrl)
+	data, _, err := getHttp(parameters.TokenListUrl)
 	if err != nil {
-		log.Printf("Error getting know wallet\n%s\n", err)
+		log.Printf("Error refreshing tokens: %v", err)
+		return
 	}
-
-	json.Unmarshal(dataBytes, &Tokens)
-
+	var tokens TokenList
+	if err := json.Unmarshal(data, &tokens); err != nil {
+		log.Printf("Error decoding tokens: %v", err)
+		return
+	}
+	index := make(map[string]Token, len(tokens.Tokens))
+	for _, token := range tokens.Tokens {
+		if _, exists := index[token.ID]; !exists {
+			index[token.ID] = token
+		}
+	}
+	metadataMu.Lock()
+	Tokens = tokens
+	tokensByID = index
+	metadataMu.Unlock()
 }
 
 func searchTokenData(contractId string) Token {
-	for _, item := range Tokens.Tokens {
-		if item.ID == contractId {
-			return item
-		}
-
-	}
-	return Token{}
+	metadataMu.RLock()
+	defer metadataMu.RUnlock()
+	return tokensByID[contractId]
 }
 
 func loadTokensToTrack() {
