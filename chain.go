@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -254,7 +253,7 @@ var ignoredAddressPairs = map[string]string{
 // connection after a backoff, instead of leaving the process stuck forever with no logs.
 func getBlocksFullnode(ch chan Tx) {
 
-	u := url.URL{Scheme: "wss", Host: parameters.WsFullnode, Path: "/events"}
+	endpoint := fullnodeBaseURL(parameters.WsFullnode, true) + "/events"
 	interrupt = make(chan os.Signal, 1) // Channel to listen for interrupt signal to terminate gracefully
 
 	signal.Notify(interrupt, os.Interrupt) // Notify the interrupt channel for SIGINT
@@ -269,8 +268,8 @@ func getBlocksFullnode(ch chan Tx) {
 		default:
 		}
 
-		log.Printf("Connecting to fullnode websocket %s\n", u.String())
-		conn, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+		log.Printf("Connecting to fullnode websocket %s\n", endpoint)
+		conn, _, err := websocket.DefaultDialer.Dial(endpoint, nil)
 		if err != nil {
 			log.Printf("Error connecting to Websocket Server: %v. Retrying in %s\n", err, backoff)
 			if !sleepOrInterrupt(backoff) {
@@ -452,7 +451,7 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 }
 
 func isGhostUncle(blockHash string) (bool, error) {
-	url := fmt.Sprintf("https://%s/blockflow/is-block-in-main-chain?blockHash=%s", parameters.FullnodeApi, blockHash)
+	url := fmt.Sprintf("%s/blockflow/is-block-in-main-chain?blockHash=%s", fullnodeBaseURL(parameters.FullnodeApi, false), blockHash)
 
 	dataBytes, statusCode, err := getHttp(url)
 	if err != nil {
@@ -504,7 +503,7 @@ func getTxStateExplorer(txId string, tx *Transaction) bool {
 }
 
 func getHeightFullnodeState(groupFrom int, groupTo int, txHeight int) bool {
-	url := fmt.Sprintf("https://%s/blockflow/chain-info?fromGroup=%d&toGroup=%d", parameters.FullnodeApi, groupFrom, groupTo)
+	url := fmt.Sprintf("%s/blockflow/chain-info?fromGroup=%d&toGroup=%d", fullnodeBaseURL(parameters.FullnodeApi, false), groupFrom, groupTo)
 	dataBytes, statusCode, err := getHttp(url)
 	if err != nil {
 		log.Printf("Error getting height for group %d->%d: %s\n", groupFrom, groupTo, err)

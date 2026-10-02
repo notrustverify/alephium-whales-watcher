@@ -9,6 +9,8 @@ import (
 	"log"
 	"math"
 	"math/rand"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -155,6 +157,34 @@ func loadEnv() {
 	}
 	parameters.PollingIntervalSec = pollingIntervalSecInt
 
+}
+
+// Bare local addresses use plaintext; public hosts retain the HTTPS/WSS default.
+// An explicit scheme always takes precedence.
+func fullnodeBaseURL(address string, websocket bool) string {
+	address = strings.TrimRight(strings.TrimSpace(address), "/")
+	if strings.Contains(address, "://") {
+		return address
+	}
+	parsed, _ := url.Parse("http://" + address)
+	local := false
+	if parsed != nil {
+		host := parsed.Hostname()
+		ip := net.ParseIP(host)
+		local = strings.EqualFold(host, "localhost") || (ip != nil && ip.IsLoopback())
+	}
+	scheme := "https"
+	if local {
+		scheme = "http"
+	}
+	if websocket {
+		if local {
+			scheme = "ws"
+		} else {
+			scheme = "wss"
+		}
+	}
+	return scheme + "://" + address
 }
 
 func getHttp(url string) ([]byte, int, error) {

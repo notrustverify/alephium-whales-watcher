@@ -58,10 +58,7 @@ func startPowfiWatchers(ch chan MessageCex) {
 }
 
 func powfiGet(path string, target interface{}) error {
-	base := strings.TrimRight(parameters.FullnodeApi, "/")
-	if !strings.Contains(base, "://") {
-		base = "https://" + base
-	}
+	base := fullnodeBaseURL(parameters.FullnodeApi, false)
 	body, _, err := getHttp(base + path)
 	if err != nil {
 		return err

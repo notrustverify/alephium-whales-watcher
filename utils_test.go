@@ -53,3 +53,25 @@ func TestTokenRefreshKeepsLastValidSnapshot(t *testing.T) {
 		t.Fatal("valid refresh was not published")
 	}
 }
+
+func TestFullnodeBaseURL(t *testing.T) {
+	for _, tc := range []struct {
+		address   string
+		websocket bool
+		want      string
+	}{
+		{"127.0.0.1:12973", false, "http://127.0.0.1:12973"},
+		{"localhost:12973", false, "http://localhost:12973"},
+		{"[::1]:12973", false, "http://[::1]:12973"},
+		{"node.mainnet.alephium.org", false, "https://node.mainnet.alephium.org"},
+		{"http://192.168.1.2:12973/", false, "http://192.168.1.2:12973"},
+		{"https://127.0.0.1:12973", false, "https://127.0.0.1:12973"},
+		{"127.0.0.1:11973", true, "ws://127.0.0.1:11973"},
+		{"node.mainnet.alephium.org", true, "wss://node.mainnet.alephium.org"},
+		{"ws://192.168.1.2:11973/", true, "ws://192.168.1.2:11973"},
+	} {
+		if got := fullnodeBaseURL(tc.address, tc.websocket); got != tc.want {
+			t.Errorf("fullnodeBaseURL(%q, %v) = %q; want %q", tc.address, tc.websocket, got, tc.want)
+		}
+	}
+}
