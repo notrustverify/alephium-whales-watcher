@@ -34,6 +34,8 @@ type MessageCex struct {
 	AmountFiat   Amount
 	ExchangeName string
 	Price        float64
+	QuoteAmount  Amount
+	TxID         string
 }
 
 type CexSymbol struct {
@@ -52,6 +54,7 @@ type Parameters struct {
 	FrontendExplorerUrl      string
 	MinAmountTrigger         float64
 	MinAmountCexTriggerUsd   float64
+	MinAmountDexTriggerUsd   float64
 	debugMode                bool
 	PollingIntervalSec       int64
 	KnownWalletUrl           string
@@ -71,6 +74,7 @@ func main() {
 	loadEnv()
 	loadTokensToTrack()
 
+	updatePrice()
 	updateTokens()
 	updateKnownWallet()
 
@@ -117,6 +121,7 @@ func main() {
 	}
 
 	go getCexTrades(chMessagesCex)
+	startPowfiWatchers(chMessagesCex)
 	getBlocksFullnode(chTxs)
 
 }

@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
@@ -25,6 +26,13 @@ import (
 const baseAlph = 1e18
 
 var coinGeckoPrice float64
+var priceMu sync.RWMutex
+
+func alphUSDPrice() float64 {
+	priceMu.RLock()
+	defer priceMu.RUnlock()
+	return coinGeckoPrice
+}
 
 type KnownWallet struct {
 	Address      string `json:"address"`
@@ -119,6 +127,16 @@ func loadEnv() {
 
 	parameters.MinAmountCexTriggerUsd = MinAmountCexTriggerUsdFloat
 
+	parameters.MinAmountDexTriggerUsd = 5000
+	if value := os.Getenv("MIN_AMOUNT_TRIGGER_DEX_USD"); value != "" {
+		threshold, err := strconv.ParseFloat(value, 64)
+		if err != nil || threshold < 0 || math.IsNaN(threshold) || math.IsInf(threshold, 0) {
+			log.Printf("invalid MIN_AMOUNT_TRIGGER_DEX_USD %q; using 5000", value)
+		} else {
+			parameters.MinAmountDexTriggerUsd = threshold
+		}
+	}
+
 	pollingIntervalSecInt, err := strconv.ParseInt(os.Getenv("POLLING_INTERVAL_SEC"), 10, 64)
 	if err != nil {
 		log.Printf("error getting polling interval from env, err: %s\n", err)
@@ -192,7 +210,7 @@ func messageFormat(msg Message, isTelegram bool) string {
 	symbol := msg.tokenData.Symbol
 	if msg.tokenData.Name == "" {
 		symbol = "ALPH"
-		amountFiat := Amount{Value: amountChain * coinGeckoPrice, Symbol: "USDT"}
+		amountFiat := Amount{Value: amountChain * alphUSDPrice(), Symbol: "USDT"}
 		amountFiatString = "(" + amountFiat.formatHuman() + ")"
 	}
 
@@ -269,6 +287,17 @@ func formatAddress(knownWallet *KnownWallet, address string, amount float64, to 
 }
 
 func formatCexMessage(msg MessageCex) string {
+	if msg.ExchangeName == "Powfi" {
+		action, emoji := "Sell", "🔴"
+		if strings.EqualFold(msg.Side, "buy") {
+			action, emoji = "Buy", "🟢"
+		}
+		valueLabel := "Total"
+		if msg.AmountFiat.Symbol == "USD" {
+			valueLabel = "Estimated value"
+		}
+		return fmt.Sprintf("%s Swap: #Powfi\n\n%s ALPH\nVolume: %s\nSwapped against: %s\n%s: %s\nRate: %.8g %s per ALPH\n\nhttps://powfi.alephium.org/swap/\n%s/#/transactions/%s", emoji, action, msg.AmountLeft.formatHuman(), msg.QuoteAmount.formatHuman(), valueLabel, msg.AmountFiat.formatHuman(), msg.Price, msg.QuoteAmount.Symbol, parameters.FrontendExplorerUrl, msg.TxID)
+	}
 
 	var sideAction string
 	var sideActionEmoji string
@@ -284,6 +313,9 @@ func formatCexMessage(msg MessageCex) string {
 
 	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %s \nTotal: %s (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, msg.AmountLeft.formatHuman(), msg.AmountFiat.formatHuman(), msg.Price)
 
+	if msg.TxID != "" {
+		text += fmt.Sprintf("\n\n%s/#/transactions/%s", parameters.FrontendExplorerUrl, msg.TxID)
+	}
 	fmt.Println(text)
 	return text
 
@@ -330,15 +362,22 @@ func sendTwitterPost(c *gotwi.Client, text string) (string, error) {
 func updatePrice() {
 	dataBytes, _, err := getHttp(parameters.PriceUrl)
 	if err != nil {
-		log.Printf("Error getting price\n%s\n", err)
+		log.Printf("Error getting ALPH/USD price: %v", err)
+		return
 	}
-
-	if len(dataBytes) > 0 {
-		var coinGeckoApi CoinGeckoPrice
-		json.Unmarshal(dataBytes, &coinGeckoApi)
-		coinGeckoPrice = coinGeckoApi.Alephium.Usd
+	var price CoinGeckoPrice
+	if err := json.Unmarshal(dataBytes, &price); err != nil {
+		log.Printf("Error decoding ALPH/USD price: %v", err)
+		return
 	}
-
+	value := price.Alephium.Usd
+	if value <= 0 || math.IsNaN(value) || math.IsInf(value, 0) {
+		log.Printf("Invalid ALPH/USD price: %g; retaining previous price", value)
+		return
+	}
+	priceMu.Lock()
+	coinGeckoPrice = value
+	priceMu.Unlock()
 }
 
 func updateKnownWallet() {
