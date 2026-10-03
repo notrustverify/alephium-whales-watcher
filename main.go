@@ -190,7 +190,7 @@ func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message) {
 			sendTelegramMessage(telegramBot, parameters.TelegramChatId, text)
 
 			if twitterBot != nil {
-				sendTwitterPost(twitterBot, text)
+				sendTwitterPost(twitterBot, formatTradeMessage(msg, false))
 			}
 			//formatCexMessage(<-chMessagesCex)
 			cexQueueMetrics.Dec()

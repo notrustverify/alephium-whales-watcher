@@ -58,7 +58,7 @@ func TestNonUSDTPowfiSwap(t *testing.T) {
 			t.Fatalf("unexpected swap: %+v", msg)
 		}
 		text := formatCexMessage(msg)
-		for _, expected := range []string{"Swap: #Powfi", "Sell ALPH", "xALPH", "Estimated value", "https://powfi.alephium.org/swap/"} {
+		for _, expected := range []string{"Swap: #Powfi", "Sell Volume: 10.00K ALPH", "xALPH", "Estimated value", "https://powfi.alephium.org/swap/", ">TX link</a>"} {
 			if !strings.Contains(text, expected) {
 				t.Fatalf("missing %q in %s", expected, text)
 			}

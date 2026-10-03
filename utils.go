@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"math"
@@ -327,38 +328,38 @@ func formatAddress(knownWallet *KnownWallet, address string, amount float64, to 
 }
 
 func formatCexMessage(msg MessageCex) string {
+	return formatTradeMessage(msg, true)
+}
+
+func formatTradeMessage(msg MessageCex, isTelegram bool) string {
+	action, emoji := "Sell", ""
+	if strings.EqualFold(msg.Side, "buy") {
+		action, emoji = "Buy", "🟢"
+	}
+	heading, tag := "Exchange", "exchange"
 	if msg.ExchangeName == "Powfi" {
-		action, emoji := "Sell", "🔴"
-		if strings.EqualFold(msg.Side, "buy") {
-			action, emoji = "Buy", "🟢"
-		}
-		valueLabel := "Total"
+		heading, tag = "Swap", "swap"
+	}
+	text := fmt.Sprintf("%s %s: #%s\n\n%s Volume: %s \nTotal: %s (at %.3f USDT)\n\n#%s", emoji, heading, msg.ExchangeName, action, msg.AmountLeft.formatHuman(), msg.AmountFiat.formatHuman(), msg.Price, tag)
+	if msg.ExchangeName == "Powfi" {
+		text = fmt.Sprintf("%s %s: #%s\n\n%s Volume: %s\nTotal: %s (at %.8g %s per ALPH)", emoji, heading, msg.ExchangeName, action, msg.AmountLeft.formatHuman(), msg.AmountFiat.formatHuman(), msg.Price, msg.QuoteAmount.Symbol)
 		if msg.AmountFiat.Symbol == "USD" {
-			valueLabel = "Estimated value"
+			text = strings.Replace(text, "Total:", "Estimated value:", 1)
 		}
-		return fmt.Sprintf("%s Swap: #Powfi\n\n%s ALPH\nVolume: %s\nSwapped against: %s\n%s: %s\nRate: %.8g %s per ALPH\n\nhttps://powfi.alephium.org/swap/\n%s/#/transactions/%s", emoji, action, msg.AmountLeft.formatHuman(), msg.QuoteAmount.formatHuman(), valueLabel, msg.AmountFiat.formatHuman(), msg.Price, msg.QuoteAmount.Symbol, parameters.FrontendExplorerUrl, msg.TxID)
+		text += "\n\n#swap\nhttps://powfi.alephium.org/swap/"
 	}
-
-	var sideAction string
-	var sideActionEmoji string
-	if strings.ToLower(msg.Side) == "buy" {
-		sideAction = "Buy"
-		sideActionEmoji = "🟢"
+	if isTelegram {
+		text = html.EscapeString(text)
 	}
-
-	if strings.ToLower(msg.Side) == "sell" {
-		sideAction = "Sell"
-		sideActionEmoji = ""
-	}
-
-	text := fmt.Sprintf("%s Exchange: #%s\n\n%s Volume: %s \nTotal: %s (at %.3f USDT)\n\n#exchange", sideActionEmoji, msg.ExchangeName, sideAction, msg.AmountLeft.formatHuman(), msg.AmountFiat.formatHuman(), msg.Price)
-
 	if msg.TxID != "" {
-		text += fmt.Sprintf("\n\n%s/#/transactions/%s", parameters.FrontendExplorerUrl, msg.TxID)
+		link := fmt.Sprintf("%s/#/transactions/%s", strings.TrimRight(parameters.FrontendExplorerUrl, "/"), msg.TxID)
+		if isTelegram {
+			text += fmt.Sprintf("\n\n<a href='%s'>TX link</a>", html.EscapeString(link))
+		} else {
+			text += "\n\n" + link
+		}
 	}
-	fmt.Println(text)
 	return text
-
 }
 
 func getAddressName(address *string) KnownWallet {
