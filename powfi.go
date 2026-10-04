@@ -30,9 +30,33 @@ type powfiPage struct {
 	NextStart int          `json:"nextStart"`
 }
 
+// Either spelling can disable tracking; a conflicting true never overrides false.
+func dexEnabled() bool {
+	for _, key := range []string{"DEX_ENABLED", "dex_enabled"} {
+		value, exists := os.LookupEnv(key)
+		if !exists {
+			continue
+		}
+		enabled, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err != nil {
+			log.Printf("invalid %s=%q; DEX swap tracking disabled", key, value)
+			return false
+		}
+		if !enabled {
+			log.Printf("DEX swap tracking disabled (%s=false)", key)
+			return false
+		}
+	}
+	log.Println("DEX swap tracking enabled")
+	return true
+}
+
 // Each configured pool has its own cursor. Starting at the current count avoids
 // replaying historical alerts; cursors stay in memory for the process lifetime.
 func startPowfiWatchers(ch chan MessageCex) {
+	if !dexEnabled() {
+		return
+	}
 	raw := strings.TrimSpace(os.Getenv("POWFI_POOL_ADDRESSES"))
 	if raw == "" {
 		return

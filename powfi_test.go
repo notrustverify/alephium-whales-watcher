@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -68,5 +69,39 @@ func TestNonUSDTPowfiSwap(t *testing.T) {
 				t.Fatal("missing price must fail")
 			}
 		}
+	}
+}
+
+func TestDEXDisabledPreventsWatchers(t *testing.T) {
+	for _, tc := range []struct{ name, upper, lower string }{
+		{"uppercase", "false", "true"},
+		{"lowercase", "true", "false"},
+		{"numeric", "0", "true"},
+		{"invalid", "disabled", "true"},
+		{"empty", "", "true"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("DEX_ENABLED", tc.upper)
+			t.Setenv("dex_enabled", tc.lower)
+			t.Setenv("POWFI_POOL_ADDRESSES", "configured-pool")
+			if dexEnabled() {
+				t.Fatal("DEX should be disabled")
+			}
+			// A nil channel and configured pool must not start any polling.
+			startPowfiWatchers(nil)
+		})
+	}
+}
+
+func TestDEXEnabledDefault(t *testing.T) {
+	t.Setenv("DEX_ENABLED", "true")
+	t.Setenv("dex_enabled", "true")
+	if !dexEnabled() {
+		t.Fatal("explicit true should enable DEX")
+	}
+	os.Unsetenv("DEX_ENABLED")
+	os.Unsetenv("dex_enabled")
+	if !dexEnabled() {
+		t.Fatal("unset should preserve enabled default")
 	}
 }
