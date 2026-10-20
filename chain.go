@@ -410,6 +410,7 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 	if block.Method == subscriptionNotify {
 		blockData := block.Params.Result.Block
 
+		mainChainVerified := false
 		cntRetry := 0
 		for {
 			if getHeightFullnodeState(blockData.ChainFrom, blockData.ChainTo, blockData.Height) {
@@ -424,6 +425,7 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 					return
 				}
 
+				mainChainVerified = err == nil
 				break
 			}
 
@@ -434,6 +436,10 @@ func getTxIdWs(block *Ws, chTxs chan Tx) {
 
 			cntRetry++
 			time.Sleep(10 * time.Second)
+		}
+
+		if transactionCountMonitor != nil && mainChainVerified {
+			transactionCountMonitor.recordBlock(block)
 		}
 
 		for _, tx := range blockData.Transactions {

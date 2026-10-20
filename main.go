@@ -102,6 +102,8 @@ func main() {
 	chMessages := make(chan Message, notificationQueueSize)
 	chMessagesCex := make(chan MessageCex, cexQueueSize)
 	chTxs := make(chan Tx, txQueueSize)
+	chTxCountAlerts := make(chan txCountAlert, notificationQueueSize)
+	transactionCountMonitor = initTxCountMonitor(chTxCountAlerts)
 
 	telegramBot = initTelegram()
 	var err error
@@ -113,7 +115,7 @@ func main() {
 
 	for w := 1; w <= maxWorkersTxs; w++ {
 		go checkTx(chTxs, chMessages, w)
-		go messageConsumer(chMessagesCex, chMessages)
+		go messageConsumer(chMessagesCex, chMessages, chTxCountAlerts)
 	}
 
 	if parameters.debugMode {
@@ -180,11 +182,17 @@ func initTwitter() (*gotwi.Client, error) {
 	return gotwi.NewClient(in)
 }
 
-func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message) {
+func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message, chTxCountAlerts chan txCountAlert) {
 
 	for {
 
 		select {
+		case alert := <-chTxCountAlerts:
+			sendTelegramMessage(telegramBot, parameters.TelegramChatId, alert.format(true))
+			if twitterBot != nil {
+				sendTwitterPost(twitterBot, alert.format(false))
+			}
+			notificationQueueMetric.Dec()
 		case msg := <-chMessagesCex:
 			text := formatCexMessage(msg)
 			sendTelegramMessage(telegramBot, parameters.TelegramChatId, text)
