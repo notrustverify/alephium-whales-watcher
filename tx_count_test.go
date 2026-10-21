@@ -28,7 +28,7 @@ func txCountTestBlock(t *testing.T, ids ...string) *Ws {
 }
 
 func TestTxCountThresholdAndRollingWindow(t *testing.T) {
-	m := &txCountMonitor{threshold: 2, seen: make(map[string]struct{})}
+	m := &txCountMonitor{window: defaultTxCountWindow, threshold: 2, seen: make(map[string]struct{})}
 	start := time.Unix(1000, 0)
 	if _, notify := m.observeBlock(txCountTestBlock(t, "a", "b"), start); notify {
 		t.Fatal("count equal to the threshold must not alert")
@@ -42,7 +42,7 @@ func TestTxCountThresholdAndRollingWindow(t *testing.T) {
 	}
 	// At exactly five minutes a and b expire, leaving c, d and e above
 	// the threshold. The count is rolling, not reset every five minutes.
-	if _, notify := m.observeBlock(txCountTestBlock(t), start.Add(txCountWindow)); notify || len(m.seen) != 3 {
+	if _, notify := m.observeBlock(txCountTestBlock(t), start.Add(defaultTxCountWindow)); notify || len(m.seen) != 3 {
 		t.Fatalf("incorrect rolling expiry: count=%d notify=%v", len(m.seen), notify)
 	}
 	// c and d now expire; f and g take the count from 1 to 3 and rearm it.
@@ -56,7 +56,7 @@ func TestTxCountThresholdAndRollingWindow(t *testing.T) {
 }
 
 func TestTxCountExcludesCoinbaseAndDuplicates(t *testing.T) {
-	m := &txCountMonitor{threshold: 1, seen: make(map[string]struct{})}
+	m := &txCountMonitor{window: defaultTxCountWindow, threshold: 1, seen: make(map[string]struct{})}
 	start := time.Unix(1000, 0)
 	block := txCountTestBlock(t, "coinbase", "a", "a", "")
 	block.Params.Result.Block.Transactions[0].Unsigned.Inputs = nil
@@ -79,7 +79,7 @@ func TestTxCountExcludesCoinbaseAndDuplicates(t *testing.T) {
 
 func TestTxCountConcurrentBlocks(t *testing.T) {
 	alerts := make(chan txCountAlert, 20)
-	m := &txCountMonitor{threshold: 2, seen: make(map[string]struct{}), alerts: alerts}
+	m := &txCountMonitor{window: defaultTxCountWindow, threshold: 2, seen: make(map[string]struct{}), alerts: alerts}
 	block := txCountTestBlock(t, "a", "b", "c")
 	var workers sync.WaitGroup
 	for i := 0; i < 20; i++ {
@@ -100,6 +100,7 @@ func TestTxCountConcurrentBlocks(t *testing.T) {
 }
 
 func TestTxCountConfiguration(t *testing.T) {
+	t.Setenv("TX_COUNT_WINDOW", "")
 	t.Setenv("PRIVATE_CHAT_ID", "-1001234567890")
 	for _, value := range []string{"", "0", "-1", "abc", "1.5", "99999999999999999999999999"} {
 		t.Run("disabled_"+value, func(t *testing.T) {
@@ -110,12 +111,13 @@ func TestTxCountConfiguration(t *testing.T) {
 		})
 	}
 	t.Setenv("TX_COUNT_THRESHOLD", " 100 ")
-	if m := initTxCountMonitor(nil); m == nil || m.threshold != 100 || m.chatID != -1001234567890 {
+	if m := initTxCountMonitor(nil); m == nil || m.threshold != 100 || m.window != defaultTxCountWindow || m.chatID != -1001234567890 {
 		t.Fatal("positive threshold should enable alerts")
 	}
 }
 
 func TestTxCountRequiresPrivateDestination(t *testing.T) {
+	t.Setenv("TX_COUNT_WINDOW", "")
 	t.Setenv("TX_COUNT_THRESHOLD", "1")
 	t.Setenv("CHAT_ID", "-1009999999999")
 	for _, value := range []string{"", "0", "abc", "-100.1", "99999999999999999999999999"} {
@@ -144,6 +146,76 @@ func TestTxCountRequiresPrivateDestination(t *testing.T) {
 	}
 }
 
+func TestTxCountWindowConfiguration(t *testing.T) {
+	t.Setenv("TX_COUNT_THRESHOLD", "1")
+	t.Setenv("PRIVATE_CHAT_ID", "-1001234567890")
+	for _, tc := range []struct {
+		value string
+		want  time.Duration
+	}{
+		{"", 5 * time.Minute},
+		{"30s", 30 * time.Second},
+		{" 10m ", 10 * time.Minute},
+		{"1h", time.Hour},
+		{"1h30m", 90 * time.Minute},
+		{"0", 0},
+		{"-5m", 0},
+		{"5", 0},
+		{"bad", 0},
+		{"999999999999999999999h", 0},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			t.Setenv("TX_COUNT_WINDOW", tc.value)
+			m := initTxCountMonitor(nil)
+			if tc.want == 0 {
+				if m != nil {
+					t.Fatal("invalid window must disable alerts")
+				}
+			} else if m == nil || m.window != tc.want {
+				t.Fatalf("expected window %s, got %+v", tc.want, m)
+			}
+		})
+	}
+}
+
+func TestTxCountConfiguredWindowExpiryAndMessage(t *testing.T) {
+	t.Setenv("TX_COUNT_THRESHOLD", "1")
+	t.Setenv("PRIVATE_CHAT_ID", "-1001234567890")
+	for _, tc := range []struct{ value, label string }{
+		{"30s", "30 seconds"},
+		{"1m", "1 minute"},
+		{"10m", "10 minutes"},
+		{"1h", "1 hour"},
+		{"2h", "2 hours"},
+		{"1m30s", "90 seconds"},
+		{"500ms", "500ms"},
+	} {
+		t.Run(tc.value, func(t *testing.T) {
+			t.Setenv("TX_COUNT_WINDOW", tc.value)
+			m := initTxCountMonitor(nil)
+			if m == nil {
+				t.Fatal("expected configured monitor")
+			}
+			start := time.Unix(1000, 0)
+			alert, notify := m.observeBlock(txCountTestBlock(t, "a", "b"), start)
+			if !notify || !strings.Contains(alert.format(true), "last "+tc.label+" across 1 block.") {
+				t.Fatalf("message should show configured window: %s", alert.format(true))
+			}
+			m.observeBlock(txCountTestBlock(t), start.Add(m.window-time.Nanosecond))
+			if len(m.seen) != 2 {
+				t.Fatal("transactions expired before the configured window")
+			}
+			m.observeBlock(txCountTestBlock(t), start.Add(m.window))
+			if len(m.seen) != 0 || m.above {
+				t.Fatal("transactions must expire exactly at the configured window and rearm")
+			}
+			if _, notify := m.observeBlock(txCountTestBlock(t, "c", "d"), start.Add(m.window)); !notify {
+				t.Fatal("expected another alert after expiry")
+			}
+		})
+	}
+}
+
 func TestTxCountOnlyRecordsConfirmedMainChainBlocks(t *testing.T) {
 	oldURL, oldMonitor := parameters.FullnodeApi, transactionCountMonitor
 	t.Cleanup(func() {
@@ -165,7 +237,7 @@ func TestTxCountOnlyRecordsConfirmedMainChainBlocks(t *testing.T) {
 	defer server.Close()
 	parameters.FullnodeApi = server.URL
 	alerts := make(chan txCountAlert, 2)
-	transactionCountMonitor = &txCountMonitor{threshold: 1, seen: make(map[string]struct{}), alerts: alerts}
+	transactionCountMonitor = &txCountMonitor{window: defaultTxCountWindow, threshold: 1, seen: make(map[string]struct{}), alerts: alerts}
 	txs := make(chan Tx, 4)
 	block := txCountTestBlock(t, "a", "b")
 	getTxIdWs(block, txs)
@@ -187,7 +259,7 @@ func TestTxCountOnlyRecordsConfirmedMainChainBlocks(t *testing.T) {
 }
 
 func TestTxCountAlertMessage(t *testing.T) {
-	alert := txCountAlert{count: 101}
+	alert := txCountAlert{window: defaultTxCountWindow, count: 101}
 	want := "🚨 High transaction activity\n\n101 confirmed transactions observed in the last 5 minutes."
 	if got := alert.format(true); got != want {
 		t.Fatalf("unexpected message without blocks: %q", got)
@@ -217,7 +289,7 @@ func TestTxCountAlertMessage(t *testing.T) {
 }
 
 func TestTxCountTelegramLengthLimitPreservesLinks(t *testing.T) {
-	alert := txCountAlert{count: 101, blocks: []txCountBlock{
+	alert := txCountAlert{window: defaultTxCountWindow, count: 101, blocks: []txCountBlock{
 		{hash: strings.Repeat("a", 2000), height: 1},
 		{hash: strings.Repeat("b", 2000), height: 2},
 		{hash: "third", height: 3},
@@ -237,7 +309,7 @@ func TestTxCountTelegramLengthLimitPreservesLinks(t *testing.T) {
 }
 
 func TestTxCountBlockReferencesFollowRollingWindow(t *testing.T) {
-	m := &txCountMonitor{threshold: 1, seen: make(map[string]struct{})}
+	m := &txCountMonitor{window: defaultTxCountWindow, threshold: 1, seen: make(map[string]struct{})}
 	start := time.Unix(1000, 0)
 	first := txCountTestBlock(t, "a")
 	first.Params.Result.Block.Hash = "first"

@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	txCountWindow                  = 5 * time.Minute
+	defaultTxCountWindow           = 5 * time.Minute
 	txCountBlockExplorerURL        = "https://explorer.alephium.org/blocks/"
 	txCountTelegramMaxMessageBytes = 4096
 )
@@ -22,6 +22,7 @@ var transactionCountMonitor *txCountMonitor
 type txCountAlert struct {
 	chatID int64
 	count  int
+	window time.Duration
 	blocks []txCountBlock // Most recently observed first.
 }
 
@@ -33,7 +34,7 @@ type txCountBlock struct {
 }
 
 func (a txCountAlert) format(isTelegram bool) string {
-	text := fmt.Sprintf("🚨 High transaction activity\n\n%d confirmed transactions observed in the last 5 minutes", a.count)
+	text := fmt.Sprintf("🚨 High transaction activity\n\n%d confirmed transactions observed in the last %s", a.count, formatTxCountWindow(a.window))
 	if len(a.blocks) > 0 {
 		unit := "blocks"
 		if len(a.blocks) == 1 {
@@ -73,6 +74,23 @@ func (a txCountAlert) format(isTelegram bool) string {
 	return text
 }
 
+func formatTxCountWindow(window time.Duration) string {
+	for _, unit := range []struct {
+		duration time.Duration
+		name     string
+	}{{time.Hour, "hour"}, {time.Minute, "minute"}, {time.Second, "second"}} {
+		if window >= unit.duration && window%unit.duration == 0 {
+			count := window / unit.duration
+			name := unit.name
+			if count != 1 {
+				name += "s"
+			}
+			return fmt.Sprintf("%d %s", count, name)
+		}
+	}
+	return window.String()
+}
+
 type countedTx struct {
 	id    string
 	at    time.Time
@@ -83,6 +101,7 @@ type txCountMonitor struct {
 	mu           sync.Mutex
 	chatID       int64
 	threshold    int
+	window       time.Duration
 	transactions []countedTx
 	seen         map[string]struct{}
 	above        bool
@@ -102,15 +121,24 @@ func initTxCountMonitor(alerts chan<- txCountAlert) *txCountMonitor {
 	if threshold == 0 {
 		return nil
 	}
+	window := defaultTxCountWindow
+	if value := strings.TrimSpace(os.Getenv("TX_COUNT_WINDOW")); value != "" {
+		window, err = time.ParseDuration(value)
+		if err != nil || window <= 0 {
+			log.Printf("invalid TX_COUNT_WINDOW %q; use a positive duration such as 30s, 5m or 1h; transaction count alerts disabled", value)
+			return nil
+		}
+	}
 	chatID, err := strconv.ParseInt(strings.TrimSpace(os.Getenv("PRIVATE_CHAT_ID")), 10, 64)
 	if err != nil || chatID == 0 {
 		log.Print("PRIVATE_CHAT_ID must be a nonzero Telegram chat ID; transaction count alerts disabled")
 		return nil
 	}
-	log.Printf("Transaction count alerts enabled: more than %d transactions in 5 minutes", threshold)
+	log.Printf("Transaction count alerts enabled: more than %d transactions in %s", threshold, formatTxCountWindow(window))
 	return &txCountMonitor{
 		chatID:    chatID,
 		threshold: threshold,
+		window:    window,
 		seen:      make(map[string]struct{}),
 		alerts:    alerts,
 	}
@@ -128,13 +156,13 @@ func (m *txCountMonitor) recordBlock(block *Ws) {
 	}
 }
 
-// observeBlock maintains the rolling interval (now - 5 minutes, now]. The caller
+// observeBlock maintains the rolling interval (now - window, now]. The caller
 // holds mu; keeping time explicit lets tests exercise expiry without sleeping.
 func (m *txCountMonitor) observeBlock(block *Ws, now time.Time) (txCountAlert, bool) {
 	if block.Method != subscriptionNotify {
 		return txCountAlert{}, false
 	}
-	cutoff := now.Add(-txCountWindow)
+	cutoff := now.Add(-m.window)
 	expired := 0
 	for expired < len(m.transactions) && !m.transactions[expired].at.After(cutoff) {
 		delete(m.seen, m.transactions[expired].id)
@@ -161,7 +189,7 @@ func (m *txCountMonitor) observeBlock(block *Ws, now time.Time) (txCountAlert, b
 	}
 	if len(m.seen) > m.threshold && !m.above {
 		m.above = true
-		alert := txCountAlert{chatID: m.chatID, count: len(m.seen)}
+		alert := txCountAlert{chatID: m.chatID, count: len(m.seen), window: m.window}
 		seenBlocks := make(map[string]bool)
 		for i := len(m.transactions) - 1; i >= 0; i-- {
 			ref := m.transactions[i].block
