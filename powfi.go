@@ -53,7 +53,7 @@ func dexEnabled() bool {
 
 // Each configured pool has its own cursor. Starting at the current count avoids
 // replaying historical alerts; cursors stay in memory for the process lifetime.
-func startPowfiWatchers(ch chan MessageCex) {
+func startPowfiWatchers(ch chan MessageCex, signals chan dexSignalAlert) {
 	if !dexEnabled() {
 		return
 	}
@@ -74,6 +74,7 @@ func startPowfiWatchers(ch chan MessageCex) {
 			interval = time.Duration(seconds) * time.Second
 		}
 	}
+	signalConfig := loadDexSignalConfig()
 	seen := map[string]bool{}
 	for _, address := range strings.Split(raw, ",") {
 		address = strings.TrimSpace(address)
@@ -81,7 +82,7 @@ func startPowfiWatchers(ch chan MessageCex) {
 			continue
 		}
 		seen[address] = true
-		go watchPowfiPool(address, interval, ch)
+		go watchPowfiPool(address, interval, ch, signals, signalConfig)
 	}
 }
 
@@ -97,11 +98,15 @@ func powfiGet(path string, target interface{}) error {
 	return nil
 }
 
-func watchPowfiPool(address string, interval time.Duration, ch chan MessageCex) {
+func watchPowfiPool(address string, interval time.Duration, ch chan MessageCex, signals chan dexSignalAlert, cfg dexSignalConfig) {
 	path := "/events/contract/" + address
 	cursor, alphIndex := 0, 0
 	quoteToken := Token{}
 	initialized := false
+	var monitor *dexSignalMonitor
+	if cfg.repeatCount > 0 || cfg.imbalancePercent > 0 {
+		monitor = &dexSignalMonitor{pool: address, cfg: cfg}
+	}
 	for {
 		err := func() error {
 			if !initialized {
@@ -151,6 +156,14 @@ func watchPowfiPool(address string, interval time.Duration, ch chan MessageCex) 
 				return fmt.Errorf("ALPH/USD price unavailable; retaining event cursor")
 			}
 			// The API cursor counts event batches, not individual events.
+			var observed []MessageCex
+			// Evaluate the complete polling batch together, including all pages.
+			defer func() {
+				if monitor != nil {
+					monitor.quote = quoteToken.Symbol
+				}
+				publishPowfiBatch(address, observed, monitor, ch, signals)
+			}()
 			for pages := 0; pages < 20; pages++ {
 				var page powfiPage
 				if err := powfiGet(fmt.Sprintf("%s?start=%d&limit=100", path, cursor), &page); err != nil {
@@ -171,11 +184,7 @@ func watchPowfiPool(address string, interval time.Duration, ch chan MessageCex) 
 						log.Printf("Powfi pool=%s tx=%s invalid swap: %v", address, event.TxID, err)
 						continue
 					}
-					if msg.AmountFiat.Value >= parameters.MinAmountDexTriggerUsd {
-						ch <- msg
-						cexQueueMetrics.Inc()
-						log.Printf("Powfi pool=%s tx=%s side=%s ALPH=%g value=%g %s", address, event.TxID, msg.Side, msg.AmountLeft.Value, msg.AmountFiat.Value, msg.AmountFiat.Symbol)
-					}
+					observed = append(observed, msg)
 				}
 				cursor = page.NextStart
 			}
@@ -185,6 +194,22 @@ func watchPowfiPool(address string, interval time.Duration, ch chan MessageCex) 
 			log.Printf("Powfi pool=%s cursor=%d error: %v; retrying in %s", address, cursor, err, interval)
 		}
 		time.Sleep(interval)
+	}
+}
+
+func publishPowfiBatch(pool string, observed []MessageCex, monitor *dexSignalMonitor, trades chan<- MessageCex, signals chan<- dexSignalAlert) {
+	for _, msg := range observed {
+		if msg.AmountFiat.Value >= parameters.MinAmountDexTriggerUsd {
+			cexQueueMetrics.Inc()
+			trades <- msg
+			log.Printf("Powfi pool=%s tx=%s side=%s ALPH=%g value=%g %s", pool, msg.TxID, msg.Side, msg.AmountLeft.Value, msg.AmountFiat.Value, msg.AmountFiat.Symbol)
+		}
+	}
+	if monitor != nil {
+		for _, alert := range monitor.observeBatch(observed, time.Now()) {
+			notificationQueueMetric.Inc()
+			signals <- alert
+		}
 	}
 }
 

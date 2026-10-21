@@ -93,7 +93,7 @@ func TestDEXDisabledPreventsWatchers(t *testing.T) {
 				t.Fatal("DEX should be disabled")
 			}
 			// A nil channel and configured pool must not start any polling.
-			startPowfiWatchers(nil)
+			startPowfiWatchers(nil, nil)
 		})
 	}
 }
@@ -119,7 +119,7 @@ func TestDEXMissingPrivateGroupPreventsWatchers(t *testing.T) {
 		t.Run(value, func(t *testing.T) {
 			t.Setenv("PRIVATE_CHAT_ID", value)
 			// A configured pool and nil channel must not start any polling.
-			startPowfiWatchers(nil)
+			startPowfiWatchers(nil, nil)
 		})
 	}
 }

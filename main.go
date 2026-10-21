@@ -103,6 +103,7 @@ func main() {
 	chMessagesCex := make(chan MessageCex, cexQueueSize)
 	chTxs := make(chan Tx, txQueueSize)
 	chTxCountAlerts := make(chan txCountAlert, notificationQueueSize)
+	chDexSignals := make(chan dexSignalAlert, notificationQueueSize)
 	transactionCountMonitor = initTxCountMonitor(chTxCountAlerts)
 
 	telegramBot = initTelegram()
@@ -115,7 +116,7 @@ func main() {
 
 	for w := 1; w <= maxWorkersTxs; w++ {
 		go checkTx(chTxs, chMessages, w)
-		go messageConsumer(chMessagesCex, chMessages, chTxCountAlerts)
+		go messageConsumer(chMessagesCex, chMessages, chTxCountAlerts, chDexSignals)
 	}
 
 	if parameters.debugMode {
@@ -123,7 +124,7 @@ func main() {
 	}
 
 	go getCexTrades(chMessagesCex)
-	startPowfiWatchers(chMessagesCex)
+	startPowfiWatchers(chMessagesCex, chDexSignals)
 	getBlocksFullnode(chTxs)
 
 }
@@ -182,11 +183,14 @@ func initTwitter() (*gotwi.Client, error) {
 	return gotwi.NewClient(in)
 }
 
-func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message, chTxCountAlerts chan txCountAlert) {
+func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message, chTxCountAlerts chan txCountAlert, chDexSignals chan dexSignalAlert) {
 
 	for {
 
 		select {
+		case alert := <-chDexSignals:
+			sendDexSignalAlert(alert)
+			notificationQueueMetric.Dec()
 		case alert := <-chTxCountAlerts:
 			sendTelegramMessage(telegramBot, alert.chatID, alert.format(true))
 			notificationQueueMetric.Dec()
