@@ -61,6 +61,10 @@ func startPowfiWatchers(ch chan MessageCex) {
 	if raw == "" {
 		return
 	}
+	if _, err := privateTelegramChatID(); err != nil {
+		log.Printf("%v; DEX swap tracking disabled", err)
+		return
+	}
 	interval := 15 * time.Second
 	if value := os.Getenv("POWFI_POLL_INTERVAL_SEC"); value != "" {
 		seconds, err := strconv.Atoi(value)

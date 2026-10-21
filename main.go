@@ -191,13 +191,7 @@ func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message, chT
 			sendTelegramMessage(telegramBot, alert.chatID, alert.format(true))
 			notificationQueueMetric.Dec()
 		case msg := <-chMessagesCex:
-			text := formatCexMessage(msg)
-			sendTelegramMessage(telegramBot, parameters.TelegramChatId, text)
-
-			if twitterBot != nil {
-				sendTwitterPost(twitterBot, formatTradeMessage(msg, false))
-			}
-			//formatCexMessage(<-chMessagesCex)
+			sendTradeAlert(msg)
 			cexQueueMetrics.Dec()
 		case msg := <-chMessages:
 			sendTelegramMessage(telegramBot, parameters.TelegramChatId, messageFormat(msg, true))
@@ -209,5 +203,22 @@ func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message, chT
 			//telegramMessageFormat(<-chMessages)
 		}
 
+	}
+}
+
+func sendTradeAlert(msg MessageCex) {
+	chatID := parameters.TelegramChatId
+	isDex := msg.ExchangeName == "Powfi"
+	if isDex {
+		var err error
+		chatID, err = privateTelegramChatID()
+		if err != nil {
+			log.Printf("%v; skipping private DEX swap alert", err)
+			return
+		}
+	}
+	sendTelegramMessage(telegramBot, chatID, formatCexMessage(msg))
+	if !isDex && twitterBot != nil {
+		sendTwitterPost(twitterBot, formatTradeMessage(msg, false))
 	}
 }

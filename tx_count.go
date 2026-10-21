@@ -129,9 +129,9 @@ func initTxCountMonitor(alerts chan<- txCountAlert) *txCountMonitor {
 			return nil
 		}
 	}
-	chatID, err := strconv.ParseInt(strings.TrimSpace(os.Getenv("PRIVATE_CHAT_ID")), 10, 64)
-	if err != nil || chatID == 0 {
-		log.Print("PRIVATE_CHAT_ID must be a nonzero Telegram chat ID; transaction count alerts disabled")
+	chatID, err := privateTelegramChatID()
+	if err != nil {
+		log.Printf("%v; transaction count alerts disabled", err)
 		return nil
 	}
 	log.Printf("Transaction count alerts enabled: more than %d transactions in %s", threshold, formatTxCountWindow(window))

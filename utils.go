@@ -89,6 +89,14 @@ var httpRetryClient = func() *retryablehttp.Client {
 	return client
 }()
 
+func privateTelegramChatID() (int64, error) {
+	chatID, err := strconv.ParseInt(strings.TrimSpace(os.Getenv("PRIVATE_CHAT_ID")), 10, 64)
+	if err != nil || chatID == 0 {
+		return 0, fmt.Errorf("PRIVATE_CHAT_ID must be a nonzero Telegram chat ID")
+	}
+	return chatID, nil
+}
+
 func loadEnv() {
 	err := godotenv.Load(".env")
 	if err != nil {
