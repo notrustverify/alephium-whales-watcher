@@ -188,10 +188,7 @@ func messageConsumer(chMessagesCex chan MessageCex, chMessages chan Message, chT
 
 		select {
 		case alert := <-chTxCountAlerts:
-			sendTelegramMessage(telegramBot, parameters.TelegramChatId, alert.format(true))
-			if twitterBot != nil {
-				sendTwitterPost(twitterBot, alert.format(false))
-			}
+			sendTelegramMessage(telegramBot, alert.chatID, alert.format(true))
 			notificationQueueMetric.Dec()
 		case msg := <-chMessagesCex:
 			text := formatCexMessage(msg)

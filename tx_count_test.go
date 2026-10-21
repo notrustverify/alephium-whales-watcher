@@ -100,6 +100,7 @@ func TestTxCountConcurrentBlocks(t *testing.T) {
 }
 
 func TestTxCountConfiguration(t *testing.T) {
+	t.Setenv("PRIVATE_CHAT_ID", "-1001234567890")
 	for _, value := range []string{"", "0", "-1", "abc", "1.5", "99999999999999999999999999"} {
 		t.Run("disabled_"+value, func(t *testing.T) {
 			t.Setenv("TX_COUNT_THRESHOLD", value)
@@ -109,8 +110,37 @@ func TestTxCountConfiguration(t *testing.T) {
 		})
 	}
 	t.Setenv("TX_COUNT_THRESHOLD", " 100 ")
-	if m := initTxCountMonitor(nil); m == nil || m.threshold != 100 {
+	if m := initTxCountMonitor(nil); m == nil || m.threshold != 100 || m.chatID != -1001234567890 {
 		t.Fatal("positive threshold should enable alerts")
+	}
+}
+
+func TestTxCountRequiresPrivateDestination(t *testing.T) {
+	t.Setenv("TX_COUNT_THRESHOLD", "1")
+	t.Setenv("CHAT_ID", "-1009999999999")
+	for _, value := range []string{"", "0", "abc", "-100.1", "99999999999999999999999999"} {
+		t.Run("disabled_"+value, func(t *testing.T) {
+			t.Setenv("PRIVATE_CHAT_ID", value)
+			if initTxCountMonitor(nil) != nil {
+				t.Fatal("missing or invalid private destination must disable alerts without falling back to CHAT_ID")
+			}
+		})
+	}
+	t.Setenv("PRIVATE_CHAT_ID", " -1001234567890 ")
+	alerts := make(chan txCountAlert, 1)
+	m := initTxCountMonitor(alerts)
+	if m == nil {
+		t.Fatal("valid private group should enable alerts")
+	}
+	m.recordBlock(txCountTestBlock(t, "a", "b"))
+	select {
+	case alert := <-alerts:
+		notificationQueueMetric.Dec()
+		if alert.chatID != -1001234567890 {
+			t.Fatalf("alert routed to wrong group: %d", alert.chatID)
+		}
+	default:
+		t.Fatal("expected private-group alert")
 	}
 }
 

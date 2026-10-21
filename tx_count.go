@@ -20,6 +20,7 @@ const (
 var transactionCountMonitor *txCountMonitor
 
 type txCountAlert struct {
+	chatID int64
 	count  int
 	blocks []txCountBlock // Most recently observed first.
 }
@@ -80,6 +81,7 @@ type countedTx struct {
 
 type txCountMonitor struct {
 	mu           sync.Mutex
+	chatID       int64
 	threshold    int
 	transactions []countedTx
 	seen         map[string]struct{}
@@ -100,8 +102,14 @@ func initTxCountMonitor(alerts chan<- txCountAlert) *txCountMonitor {
 	if threshold == 0 {
 		return nil
 	}
+	chatID, err := strconv.ParseInt(strings.TrimSpace(os.Getenv("PRIVATE_CHAT_ID")), 10, 64)
+	if err != nil || chatID == 0 {
+		log.Print("PRIVATE_CHAT_ID must be a nonzero Telegram chat ID; transaction count alerts disabled")
+		return nil
+	}
 	log.Printf("Transaction count alerts enabled: more than %d transactions in 5 minutes", threshold)
 	return &txCountMonitor{
+		chatID:    chatID,
 		threshold: threshold,
 		seen:      make(map[string]struct{}),
 		alerts:    alerts,
@@ -153,7 +161,7 @@ func (m *txCountMonitor) observeBlock(block *Ws, now time.Time) (txCountAlert, b
 	}
 	if len(m.seen) > m.threshold && !m.above {
 		m.above = true
-		alert := txCountAlert{count: len(m.seen)}
+		alert := txCountAlert{chatID: m.chatID, count: len(m.seen)}
 		seenBlocks := make(map[string]bool)
 		for i := len(m.transactions) - 1; i >= 0; i-- {
 			ref := m.transactions[i].block
